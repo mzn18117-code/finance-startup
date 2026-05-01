@@ -1,8 +1,3 @@
-تفضل الكود كاملًا بعد تحديثه وإضافة حسابك الخاص ليتمكن المشتركون من مراسلتك عليه مباشرة.
-
-كل ما عليك فعله هو نسخ الكود بالكامل واستبدال محتوى ملف `bot.py` به في GitHub:
-
-```python
 import os
 import sqlite3
 import logging
@@ -429,4 +424,3 @@ if __name__ == '__main__':
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(main())
-```
