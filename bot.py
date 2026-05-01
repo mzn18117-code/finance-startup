@@ -16,6 +16,9 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 ADMIN_ID = 7763725732
 
+# ⚠️ تم تحديث معرف قناتك هنا لتتمكن من النشر التلقائي
+CHANNEL_ID = "@StockHunter_AI" 
+
 if not TELEGRAM_TOKEN or not GEMINI_API_KEY:
     raise ValueError("⚠️ خطأ: تأكد من إدخال TELEGRAM_TOKEN و GEMINI_API_KEY في متغيرات البيئة!")
 
@@ -99,7 +102,7 @@ def calculate_rsi(data, window=14):
 
 user_context = {}
 
-# 3. سيرفر الويب المخفي المتوافق مع Render (يدعم طلبات HEAD لتجنب خطأ 501)
+# 3. سيرفر الويب المتوافق مع Render
 class PingServer(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -111,6 +114,54 @@ class PingServer(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/plain; charset=utf-8")
         self.end_headers()
+
+# 4. وظيفة النشر التلقائي في القناة
+async def auto_post_to_channel(context: ContextTypes.DEFAULT_TYPE):
+    # رمز السهم الذي يتم نشره تلقائياً
+    symbol = "NVDA"
+    logging.info(f"📢 جاري جلب التحليل التلقائي لسهم {symbol} لنشره بالقناة...")
+    try:
+        ticker = yf.Ticker(symbol)
+        history = ticker.history(period="3mo")
+        if history is None or history.empty:
+            return
+
+        current_price = float(history['Close'].dropna().iloc[-1])
+        rsi_value = calculate_rsi(history)
+        ma_50_series = history['Close'].rolling(window=min(len(history), 50)).mean().dropna()
+        ma_50 = float(ma_50_series.iloc[-1]) if not ma_50_series.empty else current_price
+
+        prompt = f"""
+        أنت مستشار مالي معتمد. حلل سهم {symbol} وقدم إجابة واضحة وموثوقة لمتابعي القناة:
+        - السعر الحالي: {current_price:.2f}
+        - مؤشر RSI: {rsi_value:.2f}
+        - المتوسط المتحرك 50 يوم: {ma_50:.2f}
+        اكتب التقرير باللغة العربية كالتالي (تجنب النجوم والشرطات السفلية تماماً):
+        1. القرار النهائي (شراء قوي أو شراء حذر أو مراقبة أو بيع).
+        2. الأسباب الفنية والمالية باختصار.
+        3. خطة التداول المباشرة (نقطة الدخول، الهدف، وقف الخسارة).
+        """
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt
+        )
+        ai_text = response.text if response and hasattr(response, 'text') else "تعذر توليد التحليل الذكي حالياً."
+
+        channel_msg = (
+            f"📢 **تقرير البوت اليومي المجاني**\n"
+            f"🔍 **السهم المختار:** {symbol}\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            f"💰 **السعر الحالي:** {current_price:.2f}\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            f"🤖 **تحليل الذكاء الاصطناعي وصنع القرار:**\n\n{ai_text}\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "🤖 لتجربة البوت مجاناً أو الاشتراك:\n"
+            "👉 @StockHunter_Pro_bot"
+        )
+        await context.bot.send_message(chat_id=CHANNEL_ID, text=channel_msg, parse_mode="Markdown")
+        logging.info("✅ تم إرسال المنشور التلقائي للقناة بنجاح.")
+    except Exception as e:
+        logging.error(f"Error auto posting to channel: {e}")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -377,19 +428,16 @@ async def deactivate_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # دالة تشغيل سيرفر الويب وسحب التحديثات في آن واحد
 async def main():
-    # 1. إعداد مجدول المهام
     scheduler = BackgroundScheduler(timezone="UTC")
     scheduler.add_job(reset_daily_usage, 'cron', hour=0, minute=0)
     scheduler.start()
 
-    # 2. بدء سيرفر الويب المخفي
     port = int(os.environ.get("PORT", 8080))
     server = HTTPServer(("0.0.0.0", port), PingServer)
     logging.info(f"🌐 تم تشغيل سيرفر الويب المدمج على المنفذ: {port}")
     
     server.timeout = 0.1
     
-    # 3. بناء تطبيق البوت
     application = Application.builder().token(TELEGRAM_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("admin", admin_panel))
@@ -398,7 +446,9 @@ async def main():
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fetch_and_analyze))
 
-    # تهيئة البوت
+    # ⏰ جدولة النشر التلقائي في القناة يومياً الساعة 7:00 صباحاً بالتوقيت العالمي
+    application.job_queue.run_daily(auto_post_to_channel, time=asyncio.datetime.time(7, 0))
+
     await application.initialize()
     await application.start()
     
