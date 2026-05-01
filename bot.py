@@ -1,8 +1,26 @@
+فكرة ممتازة وذكية جداً! اختيار الأسهم بنقرة زر يسهل على المستخدمين الوصول السريع لأشهر الأسهم (خاصة في البداية) دون الحاجة لكتابة الرموز يدوياً، مما يقلل من الأخطاء ويزيد من سرعة الاستخدام.
+
+يمكننا تطبيق هذه الفكرة بذكاء عبر عرض **قائمة بأشهر الأسهم** على شكل أزرار، مع توفير خيار **"كتابة رمز سهم آخر"** إذا رغب المستخدم في تحليل سهم غير موجود في القائمة.
+
+---
+
+### كيف سيعمل التعديل الجديد؟
+
+1. عندما يختار المستخدم **السوق الأمريكي**، ستظهر له أزرار لأشهر الأسهم الأمريكية:  
+   `NVDA` (إنفيديا)، `AAPL` (أبل)، `TSLA` (تسلا)، `MSFT` (مايكروسوفت)، بالإضافة لزر **"✍️ كتابة رمز سهم آخر"**.
+2. عندما يختار المستخدم **السوق الخليجي**، ستظهر له أزرار لأشهر الأسهم الخليجية:  
+   `2222.SR` (أرامكو)، `1120.SR` (الراجحي)، `1150.SR` (الإنماء)، `2010.SR` (سابك)، بالإضافة لزر **"✍️ كتابة رمز سهم آخر"**.
+
+---
+
+### الكود الكامل والمحدث (انسخه بالكامل وضعه في GitHub):
+
+```python
 import os
 import sqlite3
 import logging
 import asyncio
-import datetime  # تم إضافة الاستيراد الصحيح هنا
+import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import yfinance as yf
 from google import genai
@@ -21,7 +39,7 @@ ADMIN_ID = 7763725732
 CHANNEL_ID = "@StockHunter_AI" 
 
 if not TELEGRAM_TOKEN or not GEMINI_API_KEY:
-    raise ValueError("⚠️ خطأ: تأكد من إدخل TELEGRAM_TOKEN و GEMINI_API_KEY في متغيرات البيئة!")
+    raise ValueError("⚠️ خطأ: تأكد من إدخال TELEGRAM_TOKEN و GEMINI_API_KEY في متغيرات البيئة!")
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 DB_FILE = "bot_data.db"
@@ -241,14 +259,40 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if user_id in user_context:
             user_context[user_id]["service"] = srv_type
         
-        market_name = "الأمريكي" if user_context.get(user_id, {}).get("market") == "US" else "الخليجي"
-        srv_name = "التحليل الفني" if srv_type == "TECH" else "التحليل العميق وصنع القرار"
+        market = user_context.get(user_id, {}).get("market")
         
-        prompt_msg = (
-            f"✅ **تم اختيار {srv_name} في السوق {market_name}.**\n\n"
-            "⌨️ **يرجى إرسال رمز السهم الآن (مثال: NVDA أو 2222.SR):**"
-        )
-        await query.edit_message_text(prompt_msg, parse_mode="Markdown")
+        # تقديم أزرار سريعة لأشهر الأسهم بناءً على السوق
+        if market == "US":
+            msg = "🎯 **اختر أحد أشهر الأسهم الأمريكية، أو اختر الكتابة اليدوية:**"
+            keyboard = [
+                [InlineKeyboardButton("🍏 AAPL", callback_data="sym_AAPL"), InlineKeyboardButton("🚗 TSLA", callback_data="sym_TSLA")],
+                [InlineKeyboardButton("💻 MSFT", callback_data="sym_MSFT"), InlineKeyboardButton("🎮 NVDA", callback_data="sym_NVDA")],
+                [InlineKeyboardButton("✍️ كتابة رمز سهم آخر يدوياً", callback_data="sym_manual")]
+            ]
+        else:
+            msg = "🎯 **اختر أحد أشهر الأسهم الخليجية/السعودية، أو اختر الكتابة اليدوية:**"
+            keyboard = [
+                [InlineKeyboardButton("🛢️ أرامكو (2222)", callback_data="sym_2222.SR"), InlineKeyboardButton("🏦 الراجحي (1120)", callback_data="sym_1120.SR")],
+                [InlineKeyboardButton("🌿 الإنماء (1150)", callback_data="sym_1150.SR"), InlineKeyboardButton("🏭 سابك (2010)", callback_data="sym_2010.SR")],
+                [InlineKeyboardButton("✍️ كتابة رمز سهم آخر يدوياً", callback_data="sym_manual")]
+            ]
+        
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+
+    elif data.startswith("sym_"):
+        symbol = data.replace("sym_", "")
+        if symbol == "manual":
+            msg = "⌨️ **يرجى إرسال رمز السهم الآن يدوياً (مثال: NVDA أو 2222.SR):**"
+            await query.edit_message_text(msg, parse_mode="Markdown")
+        else:
+            # معالجة السهم المختار مباشرة من الأزرار دون الحاجة للكتابة
+            await query.edit_message_text(f"⏳ تم تحديد السهم `{symbol}`. جاري جلب البيانات والتحليل...")
+            # محاكاة إرسال نص كأن المستخدم كتبه
+            class DummyMessage:
+                def __init__(self, text):
+                    self.text = text
+            update.message = DummyMessage(symbol)
+            await fetch_and_analyze(update, context)
 
 async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -261,22 +305,39 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_premium == 0 and usage_count >= FREE_LIMIT:
         paywall_msg = "🔒 **انتهت محاولاتك المجانية لليوم!** يتم تجديد المحاولات تلقائياً كل 24 ساعة."
         keyboard = [[InlineKeyboardButton("💎 تفعيل الاشتراك المدفوع", callback_data="tier_premium")]]
-        await update.message.reply_text(paywall_msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+        
+        if update.message and hasattr(update.message, 'reply_text'):
+            await update.message.reply_text(paywall_msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+        else:
+            await context.bot.send_message(chat_id=user_id, text=paywall_msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
 
     if user_id not in user_context or "market" not in user_context[user_id] or "service" not in user_context[user_id]:
-        await update.message.reply_text("الرجاء البدء بالضغط على /start أولاً لتحديد السوق والخدمة.")
+        msg = "الرجاء البدء بالضغط على /start أولاً لتحديد السوق والخدمة."
+        if update.message and hasattr(update.message, 'reply_text'):
+            await update.message.reply_text(msg)
+        else:
+            await context.bot.send_message(chat_id=user_id, text=msg)
         return
 
-    symbol = update.message.text.upper().strip()
-    await update.message.reply_text(f"⏳ جاري جلب البيانات وإجراء التحليل الاحترافي لسهم {symbol}...")
+    # استخراج الرمز سواء من رسالة حقيقية أو من الضغط على زر
+    symbol = update.message.text.upper().strip() if hasattr(update.message, 'text') else update.message.text
+    
+    if update.message and hasattr(update.message, 'reply_text'):
+        await update.message.reply_text(f"⏳ جاري جلب البيانات وإجراء التحليل الاحترافي لسهم {symbol}...")
+    else:
+        await context.bot.send_message(chat_id=user_id, text=f"⏳ جاري جلب البيانات وإجراء التحليل الاحترافي لسهم {symbol}...")
     
     try:
         ticker = yf.Ticker(symbol)
         history = ticker.history(period="3mo")
         
         if history is None or history.empty:
-            await update.message.reply_text(f"❌ لم يتم العثور على بيانات للسهم `{symbol}`.")
+            err_msg = f"❌ لم يتم العثور على بيانات للسهم `{symbol}`."
+            if update.message and hasattr(update.message, 'reply_text'):
+                await update.message.reply_text(err_msg)
+            else:
+                await context.bot.send_message(chat_id=user_id, text=err_msg)
             return
 
         current_price = float(history['Close'].dropna().iloc[-1])
@@ -306,7 +367,10 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "━━━━━━━━━━━━━━━━━━━\n"
                 f"🔄 الاستخدام المتبقي لك اليوم: {remaining}"
             )
-            await update.message.reply_text(tech_report)
+            if update.message and hasattr(update.message, 'reply_text'):
+                await update.message.reply_text(tech_report)
+            else:
+                await context.bot.send_message(chat_id=user_id, text=tech_report)
 
         elif user_srv == "DEEP":
             pe_ratio = "غير متوفر"
@@ -360,11 +424,18 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "━━━━━━━━━━━━━━━━━━━\n"
                 f"🔄 الاستخدام المتبقي لك اليوم: {remaining}"
             )
-            await update.message.reply_text(deep_report)
+            if update.message and hasattr(update.message, 'reply_text'):
+                await update.message.reply_text(deep_report)
+            else:
+                await context.bot.send_message(chat_id=user_id, text=deep_report)
 
     except Exception as e:
         logging.error(f"Error executing analysis for {symbol}: {e}")
-        await update.message.reply_text(f"⚠️ حدث خطأ أثناء التحليل التقني لسهم {symbol}.")
+        err_msg = f"⚠️ حدث خطأ أثناء التحليل التقني لسهم {symbol}."
+        if update.message and hasattr(update.message, 'reply_text'):
+            await update.message.reply_text(err_msg)
+        else:
+            await context.bot.send_message(chat_id=user_id, text=err_msg)
 
 # 5. أوامر لوحة التحكم الخاصة بالمسؤول
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -446,7 +517,7 @@ async def main():
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fetch_and_analyze))
 
-    # ⏰ تم تصحيح الجدولة هنا لتستخدم datetime.time بشكل سليم
+    # جدولة النشر التلقائي في القناة يومياً الساعة 7:00 صباحاً بالتوقيت العالمي
     application.job_queue.run_daily(auto_post_to_channel, time=datetime.time(7, 0))
 
     await application.initialize()
@@ -474,3 +545,4 @@ if __name__ == '__main__':
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(main())
+```
