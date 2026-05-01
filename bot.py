@@ -1,21 +1,3 @@
-فكرة ممتازة وذكية جداً! اختيار الأسهم بنقرة زر يسهل على المستخدمين الوصول السريع لأشهر الأسهم (خاصة في البداية) دون الحاجة لكتابة الرموز يدوياً، مما يقلل من الأخطاء ويزيد من سرعة الاستخدام.
-
-يمكننا تطبيق هذه الفكرة بذكاء عبر عرض **قائمة بأشهر الأسهم** على شكل أزرار، مع توفير خيار **"كتابة رمز سهم آخر"** إذا رغب المستخدم في تحليل سهم غير موجود في القائمة.
-
----
-
-### كيف سيعمل التعديل الجديد؟
-
-1. عندما يختار المستخدم **السوق الأمريكي**، ستظهر له أزرار لأشهر الأسهم الأمريكية:  
-   `NVDA` (إنفيديا)، `AAPL` (أبل)، `TSLA` (تسلا)، `MSFT` (مايكروسوفت)، بالإضافة لزر **"✍️ كتابة رمز سهم آخر"**.
-2. عندما يختار المستخدم **السوق الخليجي**، ستظهر له أزرار لأشهر الأسهم الخليجية:  
-   `2222.SR` (أرامكو)، `1120.SR` (الراجحي)، `1150.SR` (الإنماء)، `2010.SR` (سابك)، بالإضافة لزر **"✍️ كتابة رمز سهم آخر"**.
-
----
-
-### الكود الكامل والمحدث (انسخه بالكامل وضعه في GitHub):
-
-```python
 import os
 import sqlite3
 import logging
@@ -261,7 +243,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         market = user_context.get(user_id, {}).get("market")
         
-        # تقديم أزرار سريعة لأشهر الأسهم بناءً على السوق
         if market == "US":
             msg = "🎯 **اختر أحد أشهر الأسهم الأمريكية، أو اختر الكتابة اليدوية:**"
             keyboard = [
@@ -285,9 +266,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg = "⌨️ **يرجى إرسال رمز السهم الآن يدوياً (مثال: NVDA أو 2222.SR):**"
             await query.edit_message_text(msg, parse_mode="Markdown")
         else:
-            # معالجة السهم المختار مباشرة من الأزرار دون الحاجة للكتابة
             await query.edit_message_text(f"⏳ تم تحديد السهم `{symbol}`. جاري جلب البيانات والتحليل...")
-            # محاكاة إرسال نص كأن المستخدم كتبه
             class DummyMessage:
                 def __init__(self, text):
                     self.text = text
@@ -320,7 +299,6 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=user_id, text=msg)
         return
 
-    # استخراج الرمز سواء من رسالة حقيقية أو من الضغط على زر
     symbol = update.message.text.upper().strip() if hasattr(update.message, 'text') else update.message.text
     
     if update.message and hasattr(update.message, 'reply_text'):
@@ -545,4 +523,3 @@ if __name__ == '__main__':
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(main())
-```
