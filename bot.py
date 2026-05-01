@@ -173,7 +173,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "شريكك لاتخاذ قرارات استثمارية مدروسة ومبنية على بيانات حقيقية.\n\n"
         "━━━━━━━━━━━━━━━━━━━\n"
         "✨ **النسخة المجانية:** تمنحك استعلامات محدودة للأسعار والمؤشرات الفنية.\n"
-        "👑 **الاشتراك المدفوع:** تقارير عميقة وصناعة القرار الاستثماري بدون قيود.\n"
+        "👑 **الاشتراك المدفوع:** تقارير عميقة وصناعة القرار الاستثماراري بدون قيود.\n"
         "━━━━━━━━━━━━━━━━━━━\n\n"
         "👇 **الرجاء تحديد خيارك للبدء:**"
     )
@@ -266,14 +266,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg = "⌨️ **يرجى إرسال رمز السهم الآن يدوياً (مثال: NVDA أو 2222.SR):**"
             await query.edit_message_text(msg, parse_mode="Markdown")
         else:
-            await query.edit_message_text(f"⏳ تم تحديد السهم `{symbol}`. جاري جلب البيانات والتحليل...")
-            class DummyMessage:
-                def __init__(self, text):
-                    self.text = text
-            update.message = DummyMessage(symbol)
-            await fetch_and_analyze(update, context)
+            await query.edit_message_text(f"⏳ تم اختيار السهم `{symbol}`. جاري جلب البيانات والتحليل الآن...")
+            # تمرير الرمز المستخرج مباشرة إلى دالة التحليل
+            await fetch_and_analyze(update, context, direct_symbol=symbol)
 
-async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, direct_symbol=None):
     user_id = update.effective_user.id
     username = update.effective_user.username or "مستخدم"
     
@@ -284,38 +281,28 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_premium == 0 and usage_count >= FREE_LIMIT:
         paywall_msg = "🔒 **انتهت محاولاتك المجانية لليوم!** يتم تجديد المحاولات تلقائياً كل 24 ساعة."
         keyboard = [[InlineKeyboardButton("💎 تفعيل الاشتراك المدفوع", callback_data="tier_premium")]]
-        
-        if update.message and hasattr(update.message, 'reply_text'):
-            await update.message.reply_text(paywall_msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
-        else:
-            await context.bot.send_message(chat_id=user_id, text=paywall_msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+        await context.bot.send_message(chat_id=user_id, text=paywall_msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
 
     if user_id not in user_context or "market" not in user_context[user_id] or "service" not in user_context[user_id]:
-        msg = "الرجاء البدء بالضغط على /start أولاً لتحديد السوق والخدمة."
-        if update.message and hasattr(update.message, 'reply_text'):
-            await update.message.reply_text(msg)
-        else:
-            await context.bot.send_message(chat_id=user_id, text=msg)
+        await context.bot.send_message(chat_id=user_id, text="الرجاء البدء بالضغط على /start أولاً لتحديد السوق والخدمة.")
         return
 
-    symbol = update.message.text.upper().strip() if hasattr(update.message, 'text') else update.message.text
-    
-    if update.message and hasattr(update.message, 'reply_text'):
-        await update.message.reply_text(f"⏳ جاري جلب البيانات وإجراء التحليل الاحترافي لسهم {symbol}...")
+    # تحديد رمز السهم سواء كان قادماً من الزر مباشرة أو من الرسالة المكتوبة
+    if direct_symbol:
+        symbol = direct_symbol.upper().strip()
     else:
-        await context.bot.send_message(chat_id=user_id, text=f"⏳ جاري جلب البيانات وإجراء التحليل الاحترافي لسهم {symbol}...")
+        symbol = update.message.text.upper().strip()
+
+    # إشعار المستخدم بالبدء
+    loading_msg = await context.bot.send_message(chat_id=user_id, text=f"⏳ جاري جلب البيانات وإجراء التحليل الاحترافي لسهم {symbol}...")
     
     try:
         ticker = yf.Ticker(symbol)
         history = ticker.history(period="3mo")
         
         if history is None or history.empty:
-            err_msg = f"❌ لم يتم العثور على بيانات للسهم `{symbol}`."
-            if update.message and hasattr(update.message, 'reply_text'):
-                await update.message.reply_text(err_msg)
-            else:
-                await context.bot.send_message(chat_id=user_id, text=err_msg)
+            await context.bot.send_message(chat_id=user_id, text=f"❌ لم يتم العثور على بيانات للسهم `{symbol}`. يرجى التأكد من صحة الرمز.")
             return
 
         current_price = float(history['Close'].dropna().iloc[-1])
@@ -337,18 +324,17 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
             trend = "اتجاه صاعد (Bullish)" if current_price > ma_50 else "اتجاه هابط (Bearish)"
             
             tech_report = (
-                f"📊 التقرير الفني لسهم: {symbol}\n"
+                f"📊 **التقرير الفني لسهم:** {symbol}\n"
                 "━━━━━━━━━━━━━━━━━━━\n"
-                f"💰 السعر الحالي: {current_price:.2f}\n"
-                f"📉 مؤشر الـ RSI: {rsi_value:.2f} ({tech_status})\n"
-                f"📈 الاتجاه العام: {trend}\n"
+                f"💰 **السعر الحالي:** {current_price:.2f}\n"
+                f"📉 **مؤشر الـ RSI:** {rsi_value:.2f} ({tech_status})\n"
+                f"📈 **الاتجاه العام:** {trend}\n"
                 "━━━━━━━━━━━━━━━━━━━\n"
-                f"🔄 الاستخدام المتبقي لك اليوم: {remaining}"
+                f"🔄 **الاستخدام المتبقي لك اليوم:** {remaining}"
             )
-            if update.message and hasattr(update.message, 'reply_text'):
-                await update.message.reply_text(tech_report)
-            else:
-                await context.bot.send_message(chat_id=user_id, text=tech_report)
+            # مسح رسالة التحميل السابقة وإرسال النتيجة
+            await context.bot.delete_message(chat_id=user_id, message_id=loading_msg.message_id)
+            await context.bot.send_message(chat_id=user_id, text=tech_report, parse_mode="Markdown")
 
         elif user_srv == "DEEP":
             pe_ratio = "غير متوفر"
@@ -391,29 +377,24 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ai_text = response.text if response and hasattr(response, 'text') else "عذراً، تعذر توليد القرار الذكي حالياً."
             
             deep_report = (
-                f"🔬 التحليل والقرار النهائي لسهم: {symbol}\n"
+                f"🔬 **التحليل والقرار النهائي لسهم:** {symbol}\n"
                 "━━━━━━━━━━━━━━━━━━━\n"
-                f"💰 السعر الحالي: {current_price:.2f}\n"
-                f"📉 مكرر الربحية (P/E): {pe_ratio}\n"
-                f"📊 ربحية السهم (EPS): {eps}\n"
-                f"📉 مؤشر الـ RSI: {rsi_value:.2f}\n"
+                f"💰 **السعر الحالي:** {current_price:.2f}\n"
+                f"📉 **مكرر الربحية (P/E):** {pe_ratio}\n"
+                f"📊 **ربحية السهم (EPS):** {eps}\n"
+                f"📉 **مؤشر الـ RSI:** {rsi_value:.2f}\n"
                 "━━━━━━━━━━━━━━━━━━━\n"
-                f"🤖 تقييم البوت وصناعة القرار:\n\n{ai_text}\n"
+                f"🤖 **تقييم البوت وصناعة القرار:**\n\n{ai_text}\n"
                 "━━━━━━━━━━━━━━━━━━━\n"
-                f"🔄 الاستخدام المتبقي لك اليوم: {remaining}"
+                f"🔄 **الاستخدام المتبقي لك اليوم:** {remaining}"
             )
-            if update.message and hasattr(update.message, 'reply_text'):
-                await update.message.reply_text(deep_report)
-            else:
-                await context.bot.send_message(chat_id=user_id, text=deep_report)
+            # مسح رسالة التحميل السابقة وإرسال النتيجة
+            await context.bot.delete_message(chat_id=user_id, message_id=loading_msg.message_id)
+            await context.bot.send_message(chat_id=user_id, text=deep_report, parse_mode="Markdown")
 
     except Exception as e:
         logging.error(f"Error executing analysis for {symbol}: {e}")
-        err_msg = f"⚠️ حدث خطأ أثناء التحليل التقني لسهم {symbol}."
-        if update.message and hasattr(update.message, 'reply_text'):
-            await update.message.reply_text(err_msg)
-        else:
-            await context.bot.send_message(chat_id=user_id, text=err_msg)
+        await context.bot.send_message(chat_id=user_id, text=f"⚠️ حدث خطأ أثناء جلب البيانات أو إجراء التحليل لسهم {symbol}.")
 
 # 5. أوامر لوحة التحكم الخاصة بالمسؤول
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
