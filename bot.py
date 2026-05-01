@@ -1,3 +1,23 @@
+إليك الكود المحدّث والكامل للبوت، بعد إضافة الذهب، والسلع، ومؤشرات الأسواق، مع تطبيق نظام الصلاحيات المتدرج والذكي.
+
+---
+
+## 🛠️ كيف تم توزيع الأسواق والصلاحيات في النسخة الجديدة؟
+
+تم ربط الصلاحيات مباشرة بمستوى الاشتراك (`tier_level`) كالتالي:
+
+| فئة الاشتراك | الأسواق المتاحة للاستعراض | مميزات الخدمة والتحليل |
+| :--- | :--- | :--- |
+| **0 - المجاني** | السوق الأمريكي فقط | التحليل الفني الأساسي فقط (3 محاولات يومياً) |
+| **1 - باقة 20$** | السوق الأمريكي + السوق السعودي والخليجي | التحليل المالي والفني الذكي (20 محاولة يومياً) |
+| **2 - باقة 50$** | الأمريكي + السعودي والخليجي + **الذهب والنفط والسلع** | استعلامات مفتوحة + محفظة استثمارية واحدة |
+| **3 - VIP 99$** | **جميع الأسواق والسلع + المؤشرات العالمية والعملات الرقمية الكبرى** | استعلامات مفتوحة + محافظ متعددة + تحليل VIP عالي الدقة والصرامة |
+
+---
+
+### 📂 الكود البرمجي الكامل للبوت (انسخه بالكامل):
+
+```python
 import os
 import sqlite3
 import logging
@@ -207,23 +227,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     register_or_update_user(user_id, username)
     
     welcome_msg = (
-        "🤖 **مرحباً بك في StockHunter AI V9.5** 📈\n"
-        "**مستشارك المالي الذكي لإدارة وتحليل الأسهم والأسواق المالية**\n\n"
+        "🤖 **مرحباً بك في StockHunter AI V10.0** 📈\n"
+        "**مستشارك المالي الذكي لإدارة وتحليل الأسهم والأسواق والسلع**\n\n"
         "━━━━━━━━━━━━━━━━━━━\n"
-        "💡 **كيف يعمل البوت؟**\n"
-        "يقوم البوت بالربط المباشر مع الأسواق المالية العالمية والخليجية لجلب أدق البيانات اللحظية، "
-        "ثم يدمجها مع مؤشرات التحليل الفني والمالي (مثل RSI والـ P/E)، "
-        "لتتم معالجتها بواسطة محرك ذكاء اصطناعي متقدم يمنحك قرارات تداول حاسمة وخطة استثمار واضحة.\n\n"
-        "👑 **مزايا الاشتراك والخدمات الحصرية:**\n"
-        "• **تقارير مالية معمقة:** أهداف دخول وخروج دقيقة مع وقف الخسارة الصارم.\n"
-        "• **محفظة رقمية افتراضية:** تتبع أداء أسهمك وأرباحك اللحظية تلقائياً.\n"
-        "• **تحليلات VIP:** صياغة وتقييم استثماري عالي المستوى مخصص للصفقات الكبرى.\n"
-        "• **استعلامات مفتوحة:** قدرة غير محدودة على سحب وتحليل البيانات يومياً.\n"
+        "💡 **آلية عمل البوت:**\n"
+        "يقوم البوت بالربط اللحظي مع الأسواق المالية (الأسهم، الذهب، السلع، العملات الرقمية) "
+        "ثم يدمج البيانات الحية بمؤشرات فنية ومالية دقيقة لتتم معالجتها بواسطة محرك AI متطور.\n\n"
+        "👑 **صلاحيات ومميزات الباقات:**\n"
+        "• **🆓 النسخة المجانية:** تتيح لك تحليل السوق الأمريكي فقط (فني) | 3 استعلامات يومياً.\n"
+        "• **💎 الباقة الأساسية ($20):** تشمل السوق الأمريكي والخليجي (فني + مالي) | 20 استعلام يومياً.\n"
+        "• **🔥 الباقة المتقدمة ($50):** تشمل ما سبق + (الذهب والنفط والسلع) | استعلامات غير محدودة + المحفظة الرقمية.\n"
+        "• **👑 باقة VIP المميزة ($99):** تشمل كافة الأسواق والسلع والمؤشرات والعملات الرقمية الكبرى | دعم الـ AI الأعمق والأكثر دقة.\n"
         "━━━━━━━━━━━━━━━━━━━\n"
-        "👇 **يرجى اختيار وجهتك المفضلة من الأزرار أدناه:**"
+        "👇 **يرجى اختيار وجهتك من الأزرار أدناه للبدء:**"
     )
     keyboard = [
-        [InlineKeyboardButton("🆓 استخدام النسخة المجانية", callback_data="tier_free")],
+        [InlineKeyboardButton("🏁 البدء واستعراض الأسواق المتاحة لك", callback_data="tier_free")],
         [InlineKeyboardButton("💎 باقات الاشتراك المميز (Premium)", callback_data="tier_premium_info")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -239,25 +258,61 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     data = query.data
 
+    user_data = get_user(user_id)
+    tier_level = user_data[1] if user_data else 0
+
     if data == "tier_free":
-        msg = "🎯 **لقد اخترت النسخة المجانية**\nالرجاء اختيار السوق الذي ترغب بالعمل عليه:"
-        keyboard = [
-            [InlineKeyboardButton("🇺🇸 السوق الأمريكي", callback_data="mkt_us")],
-            [InlineKeyboardButton("🇸🇦 السوق الخليجي", callback_data="mkt_gulf")]
-        ]
+        # عرض الأسواق المتاحة فقط بناءً على صلاحية المشترك
+        msg = "🎯 **الرجاء اختيار السوق أو السلعة التي ترغب بتحليلها:**"
+        keyboard = []
+        
+        # 1. السوق الأمريكي (متاح للكل)
+        keyboard.append([InlineKeyboardButton("🇺🇸 السوق الأمريكي", callback_data="mkt_us")])
+        
+        # 2. السوق الخليجي والسعودي (متاح من Tier 1 فأعلى)
+        if tier_level >= 1:
+            keyboard.append([InlineKeyboardButton("🇸🇦 السوق الخليجي والسعودي", callback_data="mkt_gulf")])
+        else:
+            keyboard.append([InlineKeyboardButton("🔒 السوق الخليجي (باقة 20$)", callback_data="alert_tier1")])
+
+        # 3. الذهب والسلع (متاح من Tier 2 فأعلى)
+        if tier_level >= 2:
+            keyboard.append([InlineKeyboardButton("📀 الذهب، النفط، والسلع", callback_data="mkt_commodities")])
+        else:
+            keyboard.append([InlineKeyboardButton("🔒 الذهب والسلع (باقة 50$)", callback_data="alert_tier2")])
+
+        # 4. العملات الرقمية والمؤشرات العالمية (متاح فقط لـ Tier 3 VIP)
+        if tier_level >= 3:
+            keyboard.append([InlineKeyboardButton("📈 المؤشرات العالمية والعملات الرقمية", callback_data="mkt_global_crypto")])
+        else:
+            keyboard.append([InlineKeyboardButton("🔒 المؤشرات والعملات الرقمية (VIP 99$)", callback_data="alert_tier3")])
+
         await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+
+    elif data.startswith("alert_tier"):
+        req_tier = data.replace("alert_tier", "")
+        tier_names = {"1": "الباقة الأساسية ($20)", "2": "الباقة المتقدمة ($50)", "3": "باقة كبار المستثمرين VIP ($99)"}
+        alert_msg = f"🔒 **عذراً! هذه الأسواق حصرية لـ {tier_names.get(req_tier)}.**\n\nبإمكانك الترقية وتفعيل حسابك للاستفادة منها."
+        keyboard = [
+            [InlineKeyboardButton("💎 استعراض خطط الاشتراك والتفعيل", callback_data="tier_premium_info")],
+            [InlineKeyboardButton("🔙 العودة للخلف", callback_data="tier_free")]
+        ]
+        await query.edit_message_text(alert_msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
     elif data == "tier_premium_info":
         premium_msg = (
             "👑 **خطط وباقات الاشتراك المتاحة:**\n\n"
             "1️⃣ **الباقة الأساسية - 20$ شهرياً**\n"
-            "• 20 محاولة يومية للتحليل الفني والمالي الذكي للسهم.\n\n"
+            "• 20 محاولة يومية للتحليل الفني والمالي الذكي للسهم.\n"
+            "• يفتح لك: السوق الأمريكي + السوق السعودي والخليجي.\n\n"
             "2️⃣ **الباقة المتقدمة - 50$ شهرياً**\n"
             "• استعلامات غير محدودة طوال اليوم.\n"
-            "• ميزة المحفظة الافتراضية لحساب الأرباح والخسائر لحظياً.\n\n"
+            "• ميزة المحفظة الافتراضية لحساب الأرباح والخسائر لحظياً.\n"
+            "• يفتح لك: الأمريكي + الخليجي + **الذهب والنفط والسلع**.\n\n"
             "3️⃣ **باقة كبار المستثمرين VIP - 99$ شهرياً**\n"
             "• جميع المميزات السابقة.\n"
-            "• تحليلات وقرارات عميقة وحازمة من الـ AI مخصصة للصفقات الكبرى.\n\n"
+            "• تحليلات وقرارات عميقة وحازمة من الـ AI مخصصة للصفقات الكبرى.\n"
+            "• يفتح لك: **جميع الأسواق والسلع والمؤشرات والعملات الرقمية الكبرى بلا قيود**.\n\n"
             "━━━━━━━━━━━━━━━━━━━\n"
             f"🔑 **كود حسابك الشخصي:** `{user_id}`\n\n"
             "📩 **لتفعيل الباقة التي تناسبك:**\n"
@@ -271,11 +326,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await start(update, context)
 
     elif data.startswith("mkt_"):
-        market_type = "US" if data == "mkt_us" else "GULF"
+        market_type = data.replace("mkt_", "").upper()
         user_context[user_id] = {"market": market_type}
-        
-        user_data = get_user(user_id)
-        tier_level = user_data[1] if user_data else 0
         
         msg = "💡 **اختر الخدمة المطلوبة:**"
         keyboard = [
@@ -298,18 +350,32 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         market = user_context.get(user_id, {}).get("market")
         
         if market == "US":
-            msg = "🎯 **اختر أحد أشهر الأسهم الأمريكية، أو اختر الكتابة اليدوية:**"
+            msg = "🇺🇸 **اختر أحد الأسهم الأمريكية الكبرى، أو اكتب الرمز يدوياً:**"
             keyboard = [
                 [InlineKeyboardButton("🍏 AAPL", callback_data="sym_AAPL"), InlineKeyboardButton("🚗 TSLA", callback_data="sym_TSLA")],
                 [InlineKeyboardButton("💻 MSFT", callback_data="sym_MSFT"), InlineKeyboardButton("🎮 NVDA", callback_data="sym_NVDA")],
                 [InlineKeyboardButton("✍️ كتابة رمز سهم آخر يدوياً", callback_data="sym_manual")]
             ]
-        else:
-            msg = "🎯 **اختر أحد أشهر الأسهم الخليجية/السعودية، أو اختر الكتابة اليدوية:**"
+        elif market == "GULF":
+            msg = "🇸🇦 **اختر أحد الأسهم الخليجية/السعودية، أو اكتب الرمز يدوياً:**"
             keyboard = [
                 [InlineKeyboardButton("🛢️ أرامكو (2222)", callback_data="sym_2222.SR"), InlineKeyboardButton("🏦 الراجحي (1120)", callback_data="sym_1120.SR")],
                 [InlineKeyboardButton("🌿 الإنماء (1150)", callback_data="sym_1150.SR"), InlineKeyboardButton("🏭 سابك (2010)", callback_data="sym_2010.SR")],
                 [InlineKeyboardButton("✍️ كتابة رمز سهم آخر يدوياً", callback_data="sym_manual")]
+            ]
+        elif market == "COMMODITIES":
+            msg = "📀 **اختر السلعة المطلوبة، أو اكتب رمزها يدوياً:**"
+            keyboard = [
+                [InlineKeyboardButton("📀 الذهب (Gold)", callback_data="sym_GC=F"), InlineKeyboardButton("🛢️ النفط الخام", callback_data="sym_CL=F")],
+                [InlineKeyboardButton("🥈 الفضة (Silver)", callback_data="sym_SI=F"), InlineKeyboardButton("⛽ الغاز الطبيعي", callback_data="sym_NG=F")],
+                [InlineKeyboardButton("✍️ كتابة رمز يدوياً", callback_data="sym_manual")]
+            ]
+        elif market == "GLOBAL_CRYPTO":
+            msg = "📈 **اختر المؤشر أو العملة الرقمية، أو اكتب الرمز يدوياً:**"
+            keyboard = [
+                [InlineKeyboardButton("🪙 بيتكوين (BTC)", callback_data="sym_BTC-USD"), InlineKeyboardButton("💎 إيثريوم (ETH)", callback_data="sym_ETH-USD")],
+                [InlineKeyboardButton("📊 مؤشر S&P 500", callback_data="sym_^GSPC"), InlineKeyboardButton("📉 مؤشر Dow Jones", callback_data="sym_^DJI")],
+                [InlineKeyboardButton("✍️ كتابة رمز يدوياً", callback_data="sym_manual")]
             ]
         
         await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
@@ -317,10 +383,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("sym_"):
         symbol = data.replace("sym_", "")
         if symbol == "manual":
-            msg = "⌨️ **يرجى إرسال رمز السهم الآن يدوياً (مثال: NVDA أو 2222.SR):**"
+            msg = "⌨️ **يرجى إرسال الرمز الآن يدوياً (مثل: NVDA أو 2222.SR أو GC=F):**"
             await query.edit_message_text(msg, parse_mode="Markdown")
         else:
-            await query.edit_message_text(f"⏳ تم اختيار السهم `{symbol}`. جاري جلب البيانات والتحليل الآن...")
+            await query.edit_message_text(f"⏳ تم اختيار `{symbol}`. جاري جلب البيانات والتحليل الآن...")
             await fetch_and_analyze(update, context, direct_symbol=symbol)
 
     elif data == "port_view":
@@ -329,10 +395,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "port_add":
         user_context[user_id]["state"] = "AWAITING_PORTFOLIO_DATA"
         await query.edit_message_text(
-            "➕ **لإضافة سهم إلى محفظتك:**\n\n"
+            "➕ **لإضافة أصل مالي إلى محفظتك:**\n\n"
             "يرجى إرسال البيانات بالصيغة التالية تماماً:\n"
-            "`رمز السهم, الكمية, سعر الشراء`\n\n"
-            "**مثال:** `AAPL, 10, 175.5`", 
+            "`رمز الأصل, الكمية, سعر الشراء`\n\n"
+            "**مثال:** `AAPL, 10, 175.5` أو `GC=F, 2, 2150.0`", 
             parse_mode="Markdown"
         )
         
@@ -340,12 +406,35 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         clear_portfolio(user_id)
         await query.edit_message_text("🗑️ تم تفريغ محفظتك الاستثمارية بالكامل بنجاح.", parse_mode="Markdown")
 
+    # أزرار لوحة تحكم المسؤول
+    elif data == "adm_list_premium" and user_id == ADMIN_ID:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id, username, tier_level FROM users WHERE tier_level > 0")
+        premium_users = cursor.fetchall()
+        conn.close()
+
+        if not premium_users:
+            await query.message.reply_text("ℹ️ لا يوجد مشتركين مدفوعين حالياً.")
+            return
+
+        list_msg = "💎 **قائمة المشتركين المدفوعين حالياً:**\n━━━━━━━━━━━━━━━━━━━\n"
+        for u_id, username, tier in premium_users:
+            tier_name = {1: "باقة 20$", 2: "باقة 50$", 3: "باقة 99$"}.get(tier)
+            list_msg += f"👤 `@{username}` | ID: `{u_id}`\n👑 الباقة: **{tier_name}**\n\n"
+            
+        await query.message.reply_text(list_msg, parse_mode="Markdown")
+
+    elif data == "adm_reset_usage" and user_id == ADMIN_ID:
+        reset_daily_usage()
+        await query.message.reply_text("✅ تم تصفير عداد الاستخدام اليومي لجميع المستخدمين بنجاح.")
+
 async def view_portfolio_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     stocks = get_portfolio(user_id)
     
     if not stocks:
-        msg = "📂 **محفظتك فارغة حالياً.**\nيمكنك البدء بإضافة الأسهم إليها."
+        msg = "📂 **محفظتك فارغة حالياً.**\nيمكنك البدء بإضافة الأسهم والأصول إليها."
         if update.callback_query:
             await update.callback_query.edit_message_text(msg, parse_mode="Markdown")
         else:
@@ -381,7 +470,7 @@ async def view_portfolio_action(update: Update, context: ContextTypes.DEFAULT_TY
         
         status_emoji = "🟢" if profit_loss >= 0 else "🔴"
         report += (
-            f"📌 **السهم:** `{symbol}`\n"
+            f"📌 **الأصل:** `{symbol}`\n"
             f"   • الكمية: {qty} | سعر الشراء: {buy_p:.2f}\n"
             f"   • السعر الحالي: {current_p:.2f}\n"
             f"   • {status_emoji} الربح/الخسارة: {profit_loss:+.2f} ({p_l_pct:+.2f}%)\n"
@@ -429,7 +518,7 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             
             add_to_portfolio(user_id, symbol, qty, buy_price)
             user_context[user_id]["state"] = None
-            await update.message.reply_text(f"✅ تم بنجاح إضافة {qty} سهم من `{symbol}` بسعر {buy_price} إلى محفظتك.", parse_mode="Markdown")
+            await update.message.reply_text(f"✅ تم بنجاح إضافة {qty} من `{symbol}` بسعر {buy_price} إلى محفظتك.", parse_mode="Markdown")
             return
         except Exception:
             await update.message.reply_text("⚠️ خطأ في الصيغة. يرجى كتابتها كالمثال: `AAPL, 10, 175.5`")
@@ -444,14 +533,14 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     else:
         symbol = update.message.text.upper().strip()
 
-    loading_msg = await context.bot.send_message(chat_id=user_id, text=f"⏳ جاري جلب البيانات وإجراء التحليل الاحترافي لسهم {symbol}...")
+    loading_msg = await context.bot.send_message(chat_id=user_id, text=f"⏳ جاري جلب البيانات وإجراء التحليل الاحترافي لـ {symbol}...")
     
     try:
         ticker = yf.Ticker(symbol)
         history = ticker.history(period="3mo")
         
         if history is None or history.empty:
-            await context.bot.send_message(chat_id=user_id, text=f"❌ لم يتم العثور على بيانات للسهم `{symbol}`.")
+            await context.bot.send_message(chat_id=user_id, text=f"❌ لم يتم العثور على بيانات لـ `{symbol}`.")
             return
 
         current_price = float(history['Close'].dropna().iloc[-1])
@@ -473,7 +562,7 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             trend = "اتجاه صاعد (Bullish)" if current_price > ma_50 else "اتجاه هابط (Bearish)"
             
             tech_report = (
-                f"📊 **التقرير الفني لسهم:** {symbol}\n"
+                f"📊 **التقرير الفني لـ:** {symbol}\n"
                 "━━━━━━━━━━━━━━━━━━━\n"
                 f"💰 **السعر الحالي:** {current_price:.2f}\n"
                 f"📉 **مؤشر الـ RSI:** {rsi_value:.2f} ({tech_status})\n"
@@ -506,7 +595,7 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
             if tier_level == 3:
                 prompt = f"""
-                أنت خبير مالي أول ومحلل مخاطر للصفقات الكبرى (VIP). حلل سهم {symbol} بناءً على الآتي:
+                أنت خبير مالي ومحلل مخاطر أول للصفقات الكبرى (VIP). حلل الأصل {symbol} بناءً على الآتي:
                 - السعر الحالي: {current_price:.2f}
                 - مكرر الربحية: {pe_ratio} | ربحية السهم: {eps}
                 - عائد التوزيعات: {div_yield:.2f}%
@@ -519,7 +608,7 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                 """
             else:
                 prompt = f"""
-                أنت مستشار مالي معتمد. حلل سهم {symbol} وقدم إجابة واضحة وموثوقة:
+                أنت مستشار مالي معتمد. حلل {symbol} وقدم إجابة واضحة وموثوقة:
                 - السعر الحالي: {current_price:.2f}
                 - مكرر الربحية: {pe_ratio} | ربحية السهم: {eps}
                 - عائد التوزيعات: {div_yield:.2f}%
@@ -539,7 +628,7 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             
             tier_name = "VIP 👑" if tier_level == 3 else "Premium 💎"
             deep_report = (
-                f"📊 **تقرير المشتركين {tier_name} لسهم:** {symbol}\n"
+                f"📊 **تقرير المشتركين {tier_name} لـ:** {symbol}\n"
                 "━━━━━━━━━━━━━━━━━━━\n"
                 f"💰 **السعر الحالي:** {current_price:.2f}\n"
                 f"📉 **مكرر الربحية (P/E):** {pe_ratio}\n"
@@ -555,7 +644,7 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
     except Exception as e:
         logging.error(f"Error executing analysis for {symbol}: {e}")
-        await context.bot.send_message(chat_id=user_id, text=f"⚠️ حدث خطأ أثناء التحليل لسهم {symbol}.")
+        await context.bot.send_message(chat_id=user_id, text=f"⚠️ حدث خطأ أثناء التحليل لـ {symbol}.")
 
 # 5. أوامر لوحة التحكم الخاصة بالمسؤول
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -574,20 +663,27 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     summary_text = ""
     for t_lvl, count in tiers_summary:
-        tier_label = {0: "مجاني", 1: "أساسي $20", 2: "متقدم $50", 3: "كبار المستثمرين VIP $99"}.get(t_lvl, "غير معروف")
+        tier_label = {0: "مجاني", 1: "أساسي $20", 2: "متقدم $50", 3: "VIP $99"}.get(t_lvl, "غير معروف")
         summary_text += f"• **{tier_label}:** {count} مستخدم\n"
 
     admin_msg = (
-        "💼 **لوحة تحكم المسؤول (Admin Panel)**\n"
+        "💼 **لوحة تحكم إدارة الاشتراكات (Admin Dashboard)**\n"
         "━━━━━━━━━━━━━━━━━━━\n"
-        f"📊 **إجمالي المستخدمين في البوت:** {total_users}\n"
-        f"📋 **تفاصيل الباقات المشتركة:**\n{summary_text}\n"
+        f"📊 **إجمالي المستخدمين المسجلين:** {total_users} مستخدم\n\n"
+        f"📋 **تفاصيل الاشتراكات الحالية:**\n{summary_text}\n"
         "━━━━━━━━━━━━━━━━━━━\n"
-        "💡 **لتفعيل مستخدم أو تغيير باقته أرسل:**\n"
-        "`/activate user_id tier_level`\n"
-        "* المستويات المتاحة (0 مجاني، 1 باقة $20، 2 باقة $50، 3 باقة $99)."
+        "⚙️ **خيارات التحكم السريع:**\n"
+        "لتفعيل أو تغيير باقة مشترك، استخدم الأمر:\n"
+        "`/activate [User_ID] [Tier_Level]`\n\n"
+        "📌 **دليل المستويات:**\n"
+        "• `0` = مجاني | `1` = باقة 20$ | `2` = باقة 50$ | `3` = VIP 99$"
     )
-    await update.message.reply_text(admin_msg, parse_mode="Markdown")
+    
+    keyboard = [
+        [InlineKeyboardButton("📋 عرض قائمة المشتركين المدفوعين", callback_data="adm_list_premium")],
+        [InlineKeyboardButton("🔄 تصفير عداد الاستخدام يدوياً", callback_data="adm_reset_usage")]
+    ]
+    await update.message.reply_text(admin_msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 async def activate_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -608,7 +704,7 @@ async def activate_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await update.message.reply_text(f"✅ تم بنجاح تفعيل الباقة **{tier_label}** للمستخدم: `{target_id}`")
         try:
-            await context.bot.send_message(chat_id=target_id, text=f"🎉 **مبروك! تم تفعيل اشتراكك في باقة: {tier_label} بنجاح.**\nيمكنك الآن استعراض ميزاتك من خلال الضغط على /start")
+            await context.bot.send_message(chat_id=target_id, text=f"🎉 **مبروك! تم تفعيل اشتراكك في باقة: {tier_label} بنجاح.**\nاضغط على /start لاستعراض ميزاتك الجديدة.")
         except:
             pass
     except ValueError:
@@ -631,6 +727,8 @@ async def main():
     application.add_handler(CommandHandler("admin", admin_panel))
     application.add_handler(CommandHandler("activate", activate_user))
     application.add_handler(CallbackQueryHandler(button_handler))
+    # التقاط الأزرار المخصصة للمسؤول
+    application.add_handler(CallbackQueryHandler(button_handler, pattern="^adm_"))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fetch_and_analyze))
 
     application.job_queue.run_daily(auto_post_to_channel, time=datetime.time(7, 0))
@@ -660,3 +758,4 @@ if __name__ == '__main__':
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(main())
+```
