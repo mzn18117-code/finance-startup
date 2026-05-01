@@ -88,7 +88,7 @@ def init_db():
 
 init_db()
 
-# دوال الاشتراكات وإدارة البيانات
+# دوال إدارة البيانات والاشتراكات
 def get_user(user_id):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -138,21 +138,6 @@ def create_subscription(user_id, plan):
     conn.commit()
     conn.close()
 
-def get_pending_subscriptions():
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, user_id, plan FROM subscriptions WHERE status='pending'")
-    rows = cursor.fetchall()
-    conn.close()
-    return rows
-
-def approve_subscription(sub_id):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE subscriptions SET status='approved' WHERE id=?", (sub_id,))
-    conn.commit()
-    conn.close()
-
 # دوال إدارة المحفظة والتنبيهات
 def add_to_portfolio(user_id, symbol, quantity, buy_price):
     conn = sqlite3.connect(DB_FILE)
@@ -169,13 +154,6 @@ def get_portfolio(user_id):
     rows = cursor.fetchall()
     conn.close()
     return rows
-
-def clear_portfolio(user_id):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM portfolios WHERE user_id = ?", (user_id,))
-    conn.commit()
-    conn.close()
 
 def add_alert(user_id, symbol, condition_type, target_price):
     conn = sqlite3.connect(DB_FILE)
@@ -200,7 +178,7 @@ def mark_alert_triggered(alert_id):
     conn.commit()
     conn.close()
 
-# وظيفة الخلفية لفحص التنبيهات
+# فحص التنبيهات دورياً
 async def check_alerts_job(context: ContextTypes.DEFAULT_TYPE):
     alerts = get_active_alerts()
     for alert_id, user_id, symbol, cond, target in alerts:
@@ -249,12 +227,7 @@ class PingServer(BaseHTTPRequestHandler):
         self.send_header("Content-type", "text/plain; charset=utf-8")
         self.end_headers()
         self.wfile.write("البوت يعمل بنجاح 🚀".encode("utf-8"))
-    def do_HEAD(self):
-        self.send_response(200)
-        self.send_header("Content-type", "text/plain; charset=utf-8")
-        self.end_headers()
 
-# النشر التلقائي في القناة
 async def auto_post_to_channel(context: ContextTypes.DEFAULT_TYPE):
     symbol = "NVDA"
     try:
@@ -291,11 +264,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_context[user_id] = {}
     
     welcome_msg = (
-        "🤖 **مرحباً بك في StockHunter AI V11.0** 📈\n"
+        "🤖 **مرحباً بك في StockHunter AI V11.5** 📈\n"
         "**منصتك الاحترافية للتحليل، إدارة المخاطر، والتنبيهات اللحظية**\n\n"
         "👑 **توزيع الميزات والصلاحيات المتاحة:**\n"
         "• **🆓 المجانية:** تحليل فني أساسي للسوق الأمريكي فقط (3 يومياً).\n"
-        "• **💎 الأساسية ($20):** الأمريكي والخليجي (فني + مالي) (20 يومياً).\n"
+        "• **💎 الأساسية ($20):** الأمريكي، الخليجي، والمصري (فني + مالي) (20 يومياً).\n"
         "• **🔥 المتقدمة ($50):** كل ما سبق + السلع والذهب + التنبيهات الذكية + حاسبة المخاطر.\n"
         "• **👑 باقة VIP ($99):** كافة الأسواق والمؤشرات + القرار الحاسِم المباشر + قراءة صور الشارتات.\n\n"
         "👇 **يرجى اختيار وجهتك من الأزرار أدناه:**"
@@ -304,8 +277,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🏁 استعراض الأسواق والخدمات", callback_data="tier_free")],
         [InlineKeyboardButton("💎 باقات الاشتراك المميز", callback_data="tier_premium_info")]
     ]
-    await (update.message.reply_text(welcome_msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown") if update.message 
-           else update.callback_query.message.reply_text(welcome_msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown"))
+    if update.message:
+        await update.message.reply_text(welcome_msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    else:
+        await update.callback_query.message.reply_text(welcome_msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -323,10 +298,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = "🎯 **الرجاء اختيار السوق أو السلعة التي ترغب بتحليلها:**"
         keyboard = [
             [InlineKeyboardButton("🇺🇸 السوق الأمريكي", callback_data="mkt_us")],
-            [InlineKeyboardButton("🇸🇦 السوق السعودي والخليجي" if tier_level >= 1 else "🔒 السوق الخليجي (باقة $20)", callback_data="mkt_gulf" if tier_level >= 1 else "alert_tier1")],
+            [InlineKeyboardButton("🇸🇦 السوق السعودي والخليجي" if tier_level >= 1 else "🔒 الخليجي (باقة $20)", callback_data="mkt_gulf" if tier_level >= 1 else "alert_tier1")],
+            [InlineKeyboardButton("🇪🇬 السوق المصري" if tier_level >= 1 else "🔒 المصري (باقة $20)", callback_data="mkt_egypt" if tier_level >= 1 else "alert_tier1")],
             [InlineKeyboardButton("📀 الذهب، النفط، والسلع" if tier_level >= 2 else "🔒 الذهب والسلع (باقة $50)", callback_data="mkt_commodities" if tier_level >= 2 else "alert_tier2")],
             [InlineKeyboardButton("📈 المؤشرات والعملات الرقمية" if tier_level >= 3 else "🔒 المؤشرات والعملات الرقمية (VIP)", callback_data="mkt_global_crypto" if tier_level >= 3 else "alert_tier3")]
         ]
+        keyboard.append([InlineKeyboardButton("🔝 العودة للرئيسية", callback_data="back_home")])
         await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
     elif data.startswith("alert_tier"):
@@ -340,7 +317,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("💎 $20 - الباقة الأساسية", callback_data="buy_1")],
             [InlineKeyboardButton("🔥 $50 - الباقة المتقدمة", callback_data="buy_2")],
             [InlineKeyboardButton("👑 $99 - VIP", callback_data="buy_3")],
-            [InlineKeyboardButton("🔙 رجوع", callback_data="back_home")]
+            [InlineKeyboardButton("🔙 العودة للرئيسية", callback_data="back_home")]
         ]
         await query.edit_message_text("💳 اختر الباقة للدفع:", reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -358,84 +335,31 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
-    elif data.startswith("pay_usdt_"):
-        tier = int(data.split("_")[2])
+    elif data.startswith("pay_"):
+        parts = data.split("_")
+        method = parts[1]
+        tier = int(parts[2])
         price = PRICES[tier]
-        msg = f"""
-💰 الدفع عبر USDT
-
-المبلغ: {price}$
-
-TRC20:
-`{USDT_ADDRESS_TRC20}`
-
-BEP20:
-`{USDT_ADDRESS_BEP20}`
-
-📸 بعد الدفع أرسل صورة التحويل هنا
-وسيتم التفعيل خلال دقائق.
-"""
+        
         user_context[user_id]["payment_tier"] = tier
         user_context[user_id]["state"] = "WAITING_PAYMENT_PROOF"
-        await query.edit_message_text(msg, parse_mode="Markdown")
 
-    elif data.startswith("pay_binance_"):
-        tier = int(data.split("_")[2])
-        price = PRICES[tier]
-        msg = f"""
-🟡 الدفع عبر Binance
+        if method == "usdt":
+            msg = f"💰 الدفع عبر USDT\n\nالمبلغ: {price}$\n\nTRC20:\n`{USDT_ADDRESS_TRC20}`\n\nBEP20:\n`{USDT_ADDRESS_BEP20}`\n\n📸 بعد الدفع أرسل صورة التحويل هنا."
+        elif method == "binance":
+            msg = f"🟡 الدفع عبر Binance\n\nID:\n`{BINANCE_ID}`\n\nالمبلغ: {price}$\n\n📸 أرسل صورة إثبات التحويل هنا."
+        else:
+            msg = f"💳 الدفع عبر PayPal\n\nالرابط:\n{PAYPAL_LINK}\n\nالمبلغ: {price}$\n\n📸 بعد الدفع أرسل صورة التحويل هنا."
 
-ID:
-`{BINANCE_ID}`
-
-المبلغ: {price}$
-
-📸 أرسل إثبات التحويل (صورة)
-"""
-        user_context[user_id]["payment_tier"] = tier
-        user_context[user_id]["state"] = "WAITING_PAYMENT_PROOF"
-        await query.edit_message_text(msg, parse_mode="Markdown")
-
-    elif data.startswith("pay_paypal_"):
-        tier = int(data.split("_")[2])
-        price = PRICES[tier]
-        msg = f"""
-💳 الدفع عبر PayPal
-
-الرابط:
-{PAYPAL_LINK}
-
-المبلغ: {price}$
-
-📸 بعد الدفع أرسل صورة
-"""
-        user_context[user_id]["payment_tier"] = tier
-        user_context[user_id]["state"] = "WAITING_PAYMENT_PROOF"
-        await query.edit_message_text(msg)
-
-    elif data.startswith("sub_"):
-        plan = int(data.replace("sub_", ""))
-        create_subscription(user_id, plan)
-        await query.edit_message_text(
-            "✅ تم إرسال طلب اشتراكك بنجاح!\n"
-            "📩 سيتم مراجعته وتفعيله من الإدارة خلال وقت قصير."
-        )
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ موافقة", callback_data=f"approve_{user_id}_{plan}")]
-        ])
-        await context.bot.send_message(
-            chat_id=ADMIN_ID,
-            text=f"📥 طلب اشتراك جديد\n\n👤 ID: `{user_id}`\n📦 الباقة: {plan}",
-            reply_markup=keyboard,
-            parse_mode="Markdown"
-        )
+        keyboard = [[InlineKeyboardButton("🔙 رجوع لتحديد الطريقة", callback_data=f"buy_{tier}")]]
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
     elif data.startswith("approve_") and user_id == ADMIN_ID:
         parts = data.split("_")
         target_id = int(parts[1])
         plan = int(parts[2])
         set_tier_level(target_id, plan)
-        await query.edit_message_text("✅ تم تفعيل الاشتراك")
+        await query.edit_message_text("✅ تم تفعيل الاشتراك بنجاح!")
         try:
             await context.bot.send_message(
                 chat_id=target_id,
@@ -445,23 +369,20 @@ ID:
             pass
 
     elif data == "back_home":
+        await query.message.delete()
         await start(update, context)
 
     elif data.startswith("mkt_"):
         market_type = data.replace("mkt_", "").upper()
         user_context[user_id]["market"] = market_type
         
-        msg = "💡 **اختر الخدمة المطلوبة:**"
+        msg = "💡 **اختر نوع الخدمة والتحليل المطلوب:**"
         keyboard = [
             [InlineKeyboardButton("📊 تحليل فني ومؤشرات السعر", callback_data="srv_tech")],
-            [InlineKeyboardButton("🔬 تحليل مالي وفني عميق وقرار الـ AI", callback_data="srv_deep")]
+            [InlineKeyboardButton("🔬 تحليل مالي وفني عميق وقرار الـ AI", callback_data="srv_deep")],
+            [InlineKeyboardButton("🔙 العودة للقائمة السابقة", callback_data="tier_free")],
+            [InlineKeyboardButton("🔝 العودة للرئيسية", callback_data="back_home")]
         ]
-        if tier_level >= 2:
-            keyboard.append([InlineKeyboardButton("📂 المحفظة الاستثمارية", callback_data="port_view")])
-            keyboard.append([InlineKeyboardButton("➕ إضافة للمحفظة", callback_data="port_add")])
-        if tier_level >= 3:
-            keyboard.append([InlineKeyboardButton("🖼️ تحليل صورة شارت (Visual AI)", callback_data="visual_ai_prompt")])
-            
         await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
     elif data.startswith("srv_"):
@@ -470,34 +391,48 @@ ID:
         
         market = user_context.get(user_id, {}).get("market")
         if market == "US":
-            keyboard = [[InlineKeyboardButton("🍏 AAPL", callback_data="sym_AAPL"), InlineKeyboardButton("🚗 TSLA", callback_data="sym_TSLA")],
-                        [InlineKeyboardButton("🎮 NVDA", callback_data="sym_NVDA"), InlineKeyboardButton("✍️ إرسال رمز آخر", callback_data="sym_manual")]]
+            keyboard = [
+                [InlineKeyboardButton("🍏 Apple", callback_data="sym_AAPL"), InlineKeyboardButton("🚗 Tesla", callback_data="sym_TSLA")],
+                [InlineKeyboardButton("🎮 Nvidia", callback_data="sym_NVDA"), InlineKeyboardButton("📦 Amazon", callback_data="sym_AMZN")],
+                [InlineKeyboardButton("💻 Microsoft", callback_data="sym_MSFT"), InlineKeyboardButton("🔍 Google", callback_data="sym_GOOGL")]
+            ]
         elif market == "GULF":
-            keyboard = [[InlineKeyboardButton("🛢️ أرامكو (2222.SR)", callback_data="sym_2222.SR"), InlineKeyboardButton("🏦 الراجحي (1120.SR)", callback_data="sym_1120.SR")],
-                        [InlineKeyboardButton("✍️ إرسال رمز آخر", callback_data="sym_manual")]]
+            keyboard = [
+                [InlineKeyboardButton("🛢️ أرامكو (2222.SR)", callback_data="sym_2222.SR"), InlineKeyboardButton("🏦 الراجحي (1120.SR)", callback_data="sym_1120.SR")],
+                [InlineKeyboardButton("⚡ كهرباء السعودية (5110.SR)", callback_data="sym_5110.SR"), InlineKeyboardButton("📡 STC (7010.SR)", callback_data="sym_7010.SR")]
+            ]
+        elif market == "EGYPT":
+            keyboard = [
+                [InlineKeyboardButton("🏦 التجاري الدولي (COMI.CA)", callback_data="sym_COMI.CA"), InlineKeyboardButton("📱 فودافون مصر (ETEL.CA)", callback_data="sym_ETEL.CA")],
+                [InlineKeyboardButton("🏭 أبو قير للأسمدة (ABUK.CA)", callback_data="sym_ABUK.CA"), InlineKeyboardButton("🌾 إي فاينانس (EFIH.CA)", callback_data="sym_EFIH.CA")]
+            ]
         elif market == "COMMODITIES":
-            keyboard = [[InlineKeyboardButton("📀 الذهب", callback_data="sym_GC=F"), InlineKeyboardButton("🛢️ النفط الخام", callback_data="sym_CL=F")],
-                        [InlineKeyboardButton("✍️ إرسال رمز آخر", callback_data="sym_manual")]]
+            keyboard = [
+                [InlineKeyboardButton("📀 الذهب", callback_data="sym_GC=F"), InlineKeyboardButton("🛢️ النفط الخام", callback_data="sym_CL=F")],
+                [InlineKeyboardButton("⚪ الفضة", callback_data="sym_SI=F"), InlineKeyboardButton("⛽ الغاز الطبيعي", callback_data="sym_NG=F")]
+            ]
         else:
-            keyboard = [[InlineKeyboardButton("🪙 بيتكوين", callback_data="sym_BTC-USD"), InlineKeyboardButton("📊 مؤشر S&P 500", callback_data="sym_^GSPC")],
-                        [InlineKeyboardButton("✍️ إرسال رمز آخر", callback_data="sym_manual")]]
+            keyboard = [
+                [InlineKeyboardButton("🪙 Bitcoin", callback_data="sym_BTC-USD"), InlineKeyboardButton("🔷 Ethereum", callback_data="sym_ETH-USD")],
+                [InlineKeyboardButton("📊 S&P 500", callback_data="sym_^GSPC"), InlineKeyboardButton("Nasdaq", callback_data="sym_^IXIC")]
+            ]
             
-        await query.edit_message_text("⌨️ اختر الرمز أو اكتبه يدوياً:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+        keyboard.append([InlineKeyboardButton("✍️ إدخال رمز آخر يدوياً", callback_data="sym_manual")])
+        keyboard.append([InlineKeyboardButton("🔙 العودة للقائمة السابقة", callback_data=f"mkt_{market.lower()}")])
+        keyboard.append([InlineKeyboardButton("🔝 العودة للرئيسية", callback_data="back_home")])
+            
+        await query.edit_message_text("⌨️ اختر السهم/الأصل أو أدخل الرمز يدوياً:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
     elif data.startswith("sym_"):
         symbol = data.replace("sym_", "")
         if symbol == "manual":
-            await query.edit_message_text("⌨️ **أرسل الرمز الآن مباشرة في الشات (مثل: MSFT):**", parse_mode="Markdown")
+            await query.edit_message_text("⌨️ **أرسل الرمز الآن مباشرة في الشات (مثل: MSFT أو 2222.SR):**", parse_mode="Markdown")
         else:
-            await query.edit_message_text(f"⏳ جاري تحليل `{symbol}`...")
+            await query.edit_message_text(f"⏳ جاري التحليل الاحترافي لـ `{symbol}`...")
             await fetch_and_analyze(update, context, direct_symbol=symbol)
 
     elif data == "port_view" and tier_level >= 2:
         await view_portfolio_action(update, context)
-        
-    elif data == "port_add" and tier_level >= 2:
-        user_context[user_id]["state"] = "AWAITING_PORTFOLIO_DATA"
-        await query.edit_message_text("➕ أرسل البيانات بالصيغة التالية:\n`رمز الأصل, الكمية, سعر الشراء`", parse_mode="Markdown")
 
     elif data == "visual_ai_prompt" and tier_level >= 3:
         user_context[user_id]["state"] = "AWAITING_CHART_IMAGE"
@@ -524,9 +459,12 @@ ID:
 async def view_portfolio_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     stocks = get_portfolio(user_id)
+    keyboard = [[InlineKeyboardButton("🔙 العودة للرئيسية", callback_data="back_home")]]
+    
     if not stocks:
-        await context.bot.send_message(chat_id=user_id, text="📂 محفظتك فارغة حالياً.", parse_mode="Markdown")
+        await context.bot.send_message(chat_id=user_id, text="📂 محفظتك فارغة حالياً.", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
+        
     report = "📂 **تقرير محفظتك الاستثمارية:**\n━━━━━━━━━━━━━━━━━━━\n"
     total_cost = total_value = 0.0
     for symbol, qty, buy_p in stocks:
@@ -543,7 +481,7 @@ async def view_portfolio_action(update: Update, context: ContextTypes.DEFAULT_TY
     
     total_pl = total_value - total_cost
     report += f"━━━━━━━━━━━━━━━━━━━\n💰 التكلفة الإجمالية: {total_cost:.2f} | القيمة الحالية: {total_value:.2f}\n📊 صافي الأداء: {total_pl:+.2f} ({((total_pl)/total_cost)*100 if total_cost>0 else 0:+.2f}%)"
-    await context.bot.send_message(chat_id=user_id, text=report, parse_mode="Markdown")
+    await context.bot.send_message(chat_id=user_id, text=report, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 # أوامر التنبيه الذكي وإدارة المخاطر
 async def create_alert_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -586,7 +524,7 @@ async def risk_calculator_command(update: Update, context: ContextTypes.DEFAULT_
             await update.message.reply_text("❌ لا يمكن أن يكون سعر الدخول مساوياً لوقف الخسارة.")
             return
             
-        risk_amount = balance * 0.02 # نسبة المخاطرة القياسية 2%
+        risk_amount = balance * 0.02 # نسبة المخاطرة 2%
         loss_per_share = abs(entry - stop)
         shares_to_buy = risk_amount / loss_per_share
         total_cost = shares_to_buy * entry
@@ -604,7 +542,7 @@ async def risk_calculator_command(update: Update, context: ContextTypes.DEFAULT_
     except Exception:
         await update.message.reply_text("⚠️ خطأ في المدخلات. تأكد من إدخال أرقام صحيحة.")
 
-# معالجة الصور (Visual AI) للـ VIP
+# معالجة صور الشارتات
 async def handle_image_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_data = get_user(user_id)
@@ -629,12 +567,14 @@ async def handle_image_analysis(update: Update, context: ContextTypes.DEFAULT_TY
             )
             ai_text = response.text if response and hasattr(response, 'text') else "تعذر تحليل الشارت المرفق حالياً."
             await context.bot.delete_message(chat_id=user_id, message_id=loading_msg.message_id)
-            await update.message.reply_text(f"🖼️ **التقرير الفني البصري للـ AI:**\n\n{ai_text}", parse_mode="Markdown")
+            
+            keyboard = [[InlineKeyboardButton("🔝 العودة للرئيسية", callback_data="back_home")]]
+            await update.message.reply_text(f"🖼️ **التقرير الفني البصري للـ AI:**\n\n{ai_text}", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         except Exception as e:
             logging.error(f"Visual AI Error: {e}")
             await update.message.reply_text("⚠️ حدث خطأ أثناء معالجة وقراءة الصورة.")
 
-# استقبال إثباتات الدفع بالصور
+# استقبال إثباتات الدفع
 async def handle_payment_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id in user_context and user_context[user_id].get("state") == "WAITING_PAYMENT_PROOF":
@@ -662,6 +602,7 @@ async def handle_payment_proof(update: Update, context: ContextTypes.DEFAULT_TYP
         return True
     return False
 
+# جلب البيانات والتحليل العميق
 async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, direct_symbol=None):
     user_id = update.effective_user.id
     username = update.effective_user.username or "مستخدم"
@@ -669,46 +610,36 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     user_data = get_user(user_id)
     usage_count, tier_level = user_data[0], user_data[1]
 
+    # أزرار الرجوع بعد التحليل
+    srv_type = user_context.get(user_id, {}).get("service", "TECH")
+    market = user_context.get(user_id, {}).get("market", "US")
+    keyboard = [
+        [InlineKeyboardButton("🔙 العودة للقائمة السابقة", callback_data=f"srv_{srv_type.lower()}")],
+        [InlineKeyboardButton("🔝 العودة للرئيسية", callback_data="back_home")]
+    ]
+
     if tier_level == 0 and usage_count >= FREE_LIMIT:
-        await context.bot.send_message(chat_id=user_id, text="🔒 انتهت المحاولات المجانية اليوم (3).", parse_mode="Markdown")
+        await context.bot.send_message(chat_id=user_id, text="🔒 انتهت المحاولات المجانية اليوم (3).", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
     elif tier_level == 1 and usage_count >= TIER1_LIMIT:
-        await context.bot.send_message(chat_id=user_id, text="🔒 انتهت محاولاتك لليوم (20).", parse_mode="Markdown")
-        return
-
-    if user_id in user_context and user_context[user_id].get("state") == "AWAITING_PORTFOLIO_DATA" and not direct_symbol:
-        try:
-            parts = update.message.text.split(",")
-            symbol = parts[0].strip().upper()
-            qty = float(parts[1].strip())
-            buy_price = float(parts[2].strip())
-            add_to_portfolio(user_id, symbol, qty, buy_price)
-            user_context[user_id]["state"] = None
-            await update.message.reply_text(f"✅ تم إضافة `{symbol}` للمحفظة بنجاح.")
-            return
-        except Exception:
-            await update.message.reply_text("⚠️ خطأ في الصيغة. استخدم:\n`رمز, كمية, سعر`")
-            return
-
-    if user_id not in user_context or "market" not in user_context[user_id] or "service" not in user_context[user_id]:
-        await context.bot.send_message(chat_id=user_id, text="الرجاء البدء بالضغط على /start أولاً.")
+        await context.bot.send_message(chat_id=user_id, text="🔒 انتهت محاولاتك لليوم (20).", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
 
     symbol = direct_symbol.upper().strip() if direct_symbol else update.message.text.upper().strip()
-    loading_msg = await context.bot.send_message(chat_id=user_id, text=f"⏳ جاري التحليل الاحترافي لـ {symbol}...")
+    loading_msg = await context.bot.send_message(chat_id=user_id, text=f"⏳ جاري جلب البيانات وإجراء التحليل المتقدم لـ {symbol}...")
     
     try:
         ticker = yf.Ticker(symbol)
         history = ticker.history(period="3mo")
         if history is None or history.empty:
-            await context.bot.send_message(chat_id=user_id, text=f"❌ لم نجد بيانات لـ `{symbol}`.")
+            await context.bot.send_message(chat_id=user_id, text=f"❌ لم نجد بيانات لـ `{symbol}`.", reply_markup=InlineKeyboardMarkup(keyboard))
             return
 
         current_price = float(history['Close'].dropna().iloc[-1])
         rsi_value = calculate_rsi(history)
         ma_50 = float(history['Close'].rolling(window=min(len(history), 50)).mean().dropna().iloc[-1])
         
-        user_srv = user_context[user_id]["service"]
+        user_srv = user_context[user_id].get("service", "TECH")
         if tier_level < 2:
             increment_usage(user_id)
             remaining = (FREE_LIMIT if tier_level == 0 else TIER1_LIMIT) - (usage_count + 1)
@@ -716,23 +647,23 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             remaining = "مفتوح (VIP 👑)"
 
         if user_srv == "TECH":
-            status = "تشبع بيعي" if rsi_value < 35 else "تشبع شرائي" if rsi_value > 65 else "حياد واستقرار"
-            trend = "صاعد (Bullish)" if current_price > ma_50 else "هابط (Bearish)"
+            status = "تشبع بيعي (فرصة شراء محتملة)" if rsi_value < 35 else "تشبع شرائي (تصريف محتمل)" if rsi_value > 65 else "حياد واستقرار"
+            trend = "صاعد قوي (Bullish)" if current_price > ma_50 else "هابط ضعيف (Bearish)"
             tech_report = (
                 f"📊 **التقرير الفني لـ:** {symbol}\n"
                 "━━━━━━━━━━━━━━━━━━━\n"
                 f"💰 **السعر الحالي:** {current_price:.2f}\n"
-                f"📉 **مؤشر RSI:** {rsi_value:.2f} ({status})\n"
-                f"📈 **الاتجاه العام:** {trend}\n"
+                f"📉 **مؤشر RSI (14):** {rsi_value:.2f} ({status})\n"
+                f"📈 **الاتجاه العام (MA50):** {trend}\n"
                 "━━━━━━━━━━━━━━━━━━━\n"
                 f"🔄 الاستخدام المتبقي: {remaining}"
             )
             await context.bot.delete_message(chat_id=user_id, message_id=loading_msg.message_id)
-            await context.bot.send_message(chat_id=user_id, text=tech_report, parse_mode="Markdown")
+            await context.bot.send_message(chat_id=user_id, text=tech_report, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
         elif user_srv == "DEEP":
             if tier_level == 0:
-                await context.bot.send_message(chat_id=user_id, text="⚠️ هذه الميزة للمشتركين Premium فقط.")
+                await context.bot.send_message(chat_id=user_id, text="⚠️ هذه الميزة للمشتركين Premium فقط.", reply_markup=InlineKeyboardMarkup(keyboard))
                 return
             pe_ratio = eps = "غير متوفر"
             div_yield = 0.0
@@ -750,23 +681,24 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             if tier_level == 3:
                 prompt = f"""
                 أنت خبير مالي ومحلل مخاطر أول للصفقات الكبرى (VIP). حلل {symbol}:
-                السعر: {current_price:.2f}, مكرر الربحية: {pe_ratio}, ربحية السهم: {eps}, العائد: {div_yield:.2f}%, RSI {rsi_value:.2f}, MA50 {ma_50:.2f}.
+                السعر الحالي: {current_price:.2f}, مكرر الربحية: {pe_ratio}, ربحية السهم: {eps}, العائد السنوي: {div_yield:.2f}%, RSI {rsi_value:.2f}, MA50 {ma_50:.2f}.
                 
-                شروط صارمة للإجابة (تجنب النجوم تماماً):
-                1. ممنوع نهائياً استخدام خيار (مراقبة) أو (حياد). يجب اتخاذ قرار حاسم: إما (شراء) أو (بيع).
+                شروط صارمة للإجابة بالكامل باللغة العربية (تجنب النجوم تماماً):
+                1. ممنوع نهائياً استخدام خيارات مثل (مراقبة) أو (حياد). يجب اتخاذ قرار حاسم: إما (شراء) أو (بيع).
                 2. ابدأ التقرير بملخص تنفيذي من سطرين يوضح القرار مباشرة.
-                3. اذكر الأسباب الفنية والمالية باختصار.
+                3. اذكر الأسباب الفنية والمالية بالتفصيل والدقة.
                 4. اذكر خطة التداول المباشرة: (الدخول، الهدف الأول، الهدف الثاني، وقف الخسارة الصارم).
                 """
             else:
                 prompt = f"""
-                أنت مستشار مالي معتمد. حلل {symbol}:
+                أنت مستشار مالي معتمد ومحلل مالي محترف. حلل {symbol}:
                 السعر: {current_price:.2f}, مكرر الربحية: {pe_ratio}, ربحية السهم: {eps}, العائد: {div_yield:.2f}%, RSI {rsi_value:.2f}, MA50 {ma_50:.2f}.
                 اكتب التقرير باللغة العربية كالتالي دون نجوم تماماً:
                 1. القرار النهائي (شراء أو مراقبة أو بيع).
                 2. الأسباب المالية والفنية باختصار.
                 3. خطة التداول: (الدخول، الهدف، وقف الخسارة).
                 """
+            
             response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
             ai_text = response.text if response and hasattr(response, 'text') else "تعذر التحليل الذكي."
             tier_name = "VIP 👑" if tier_level == 3 else "Premium 💎"
@@ -781,10 +713,10 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                 f"🔄 الاستخدام المتبقي: {remaining}"
             )
             await context.bot.delete_message(chat_id=user_id, message_id=loading_msg.message_id)
-            await context.bot.send_message(chat_id=user_id, text=deep_report, parse_mode="Markdown")
+            await context.bot.send_message(chat_id=user_id, text=deep_report, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
     except Exception as e:
         logging.error(f"Error analytical process: {e}")
-        await context.bot.send_message(chat_id=user_id, text="⚠️ حدث خطأ أثناء التحليل.")
+        await context.bot.send_message(chat_id=user_id, text="⚠️ حدث خطأ أثناء التحليل.", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
