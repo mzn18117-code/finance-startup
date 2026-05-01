@@ -2,6 +2,7 @@ import os
 import sqlite3
 import logging
 import asyncio
+import datetime  # تم إضافة الاستيراد الصحيح هنا
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import yfinance as yf
 from google import genai
@@ -16,11 +17,11 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 ADMIN_ID = 7763725732
 
-# ⚠️ تم تحديث معرف قناتك هنا لتتمكن من النشر التلقائي
+# معرف القناة للنشر التلقائي
 CHANNEL_ID = "@StockHunter_AI" 
 
 if not TELEGRAM_TOKEN or not GEMINI_API_KEY:
-    raise ValueError("⚠️ خطأ: تأكد من إدخال TELEGRAM_TOKEN و GEMINI_API_KEY في متغيرات البيئة!")
+    raise ValueError("⚠️ خطأ: تأكد من إدخل TELEGRAM_TOKEN و GEMINI_API_KEY في متغيرات البيئة!")
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 DB_FILE = "bot_data.db"
@@ -117,7 +118,6 @@ class PingServer(BaseHTTPRequestHandler):
 
 # 4. وظيفة النشر التلقائي في القناة
 async def auto_post_to_channel(context: ContextTypes.DEFAULT_TYPE):
-    # رمز السهم الذي يتم نشره تلقائياً
     symbol = "NVDA"
     logging.info(f"📢 جاري جلب التحليل التلقائي لسهم {symbol} لنشره بالقناة...")
     try:
@@ -446,8 +446,8 @@ async def main():
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fetch_and_analyze))
 
-    # ⏰ جدولة النشر التلقائي في القناة يومياً الساعة 7:00 صباحاً بالتوقيت العالمي
-    application.job_queue.run_daily(auto_post_to_channel, time=asyncio.datetime.time(7, 0))
+    # ⏰ تم تصحيح الجدولة هنا لتستخدم datetime.time بشكل سليم
+    application.job_queue.run_daily(auto_post_to_channel, time=datetime.time(7, 0))
 
     await application.initialize()
     await application.start()
