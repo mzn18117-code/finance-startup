@@ -1,23 +1,3 @@
-إليك الكود المحدّث والكامل للبوت، بعد إضافة الذهب، والسلع، ومؤشرات الأسواق، مع تطبيق نظام الصلاحيات المتدرج والذكي.
-
----
-
-## 🛠️ كيف تم توزيع الأسواق والصلاحيات في النسخة الجديدة؟
-
-تم ربط الصلاحيات مباشرة بمستوى الاشتراك (`tier_level`) كالتالي:
-
-| فئة الاشتراك | الأسواق المتاحة للاستعراض | مميزات الخدمة والتحليل |
-| :--- | :--- | :--- |
-| **0 - المجاني** | السوق الأمريكي فقط | التحليل الفني الأساسي فقط (3 محاولات يومياً) |
-| **1 - باقة 20$** | السوق الأمريكي + السوق السعودي والخليجي | التحليل المالي والفني الذكي (20 محاولة يومياً) |
-| **2 - باقة 50$** | الأمريكي + السعودي والخليجي + **الذهب والنفط والسلع** | استعلامات مفتوحة + محفظة استثمارية واحدة |
-| **3 - VIP 99$** | **جميع الأسواق والسلع + المؤشرات العالمية والعملات الرقمية الكبرى** | استعلامات مفتوحة + محافظ متعددة + تحليل VIP عالي الدقة والصرامة |
-
----
-
-### 📂 الكود البرمجي الكامل للبوت (انسخه بالكامل):
-
-```python
 import os
 import sqlite3
 import logging
@@ -262,26 +242,21 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tier_level = user_data[1] if user_data else 0
 
     if data == "tier_free":
-        # عرض الأسواق المتاحة فقط بناءً على صلاحية المشترك
         msg = "🎯 **الرجاء اختيار السوق أو السلعة التي ترغب بتحليلها:**"
         keyboard = []
         
-        # 1. السوق الأمريكي (متاح للكل)
         keyboard.append([InlineKeyboardButton("🇺🇸 السوق الأمريكي", callback_data="mkt_us")])
         
-        # 2. السوق الخليجي والسعودي (متاح من Tier 1 فأعلى)
         if tier_level >= 1:
             keyboard.append([InlineKeyboardButton("🇸🇦 السوق الخليجي والسعودي", callback_data="mkt_gulf")])
         else:
             keyboard.append([InlineKeyboardButton("🔒 السوق الخليجي (باقة 20$)", callback_data="alert_tier1")])
 
-        # 3. الذهب والسلع (متاح من Tier 2 فأعلى)
         if tier_level >= 2:
             keyboard.append([InlineKeyboardButton("📀 الذهب، النفط، والسلع", callback_data="mkt_commodities")])
         else:
             keyboard.append([InlineKeyboardButton("🔒 الذهب والسلع (باقة 50$)", callback_data="alert_tier2")])
 
-        # 4. العملات الرقمية والمؤشرات العالمية (متاح فقط لـ Tier 3 VIP)
         if tier_level >= 3:
             keyboard.append([InlineKeyboardButton("📈 المؤشرات العالمية والعملات الرقمية", callback_data="mkt_global_crypto")])
         else:
@@ -406,7 +381,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         clear_portfolio(user_id)
         await query.edit_message_text("🗑️ تم تفريغ محفظتك الاستثمارية بالكامل بنجاح.", parse_mode="Markdown")
 
-    # أزرار لوحة تحكم المسؤول
     elif data == "adm_list_premium" and user_id == ADMIN_ID:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
@@ -727,7 +701,6 @@ async def main():
     application.add_handler(CommandHandler("admin", admin_panel))
     application.add_handler(CommandHandler("activate", activate_user))
     application.add_handler(CallbackQueryHandler(button_handler))
-    # التقاط الأزرار المخصصة للمسؤول
     application.add_handler(CallbackQueryHandler(button_handler, pattern="^adm_"))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fetch_and_analyze))
 
@@ -758,4 +731,3 @@ if __name__ == '__main__':
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(main())
-```
