@@ -1,7 +1,7 @@
 import os
 import sqlite3
 import logging
-import threading
+import asyncio
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import yfinance as yf
 from google import genai
@@ -99,7 +99,7 @@ def calculate_rsi(data, window=14):
 
 user_context = {}
 
-# 3. سيرفر الويب المخفي لإبقاء الخدمة تعمل على Render
+# 3. سيرفر الويب المخفي المتوافق مع Render (يدعم طلبات HEAD لتجنب خطأ 501)
 class PingServer(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -107,12 +107,10 @@ class PingServer(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write("البوت يعمل بنجاح 🚀".encode("utf-8"))
 
-def run_web_server():
-    # Render يمرر تلقائياً رقم المنفذ في متغير البيئة PORT
-    port = int(os.environ.get("PORT", 8080))
-    server = HTTPServer(("0.0.0.0", port), PingServer)
-    logging.info(f"🌐 تم تشغيل سيرفر الويب المخفي على المنفذ: {port}")
-    server.serve_forever()
+    def do_HEAD(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain; charset=utf-8")
+        self.end_headers()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -120,11 +118,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     register_or_update_user(user_id, username)
     
     welcome_msg = (
-        "🤖 **أهلاً بك في بوت المستشار المالي الاحترافي V8.4** 📈\n"
-        "أنا شريكك لاتخاذ قرارات استثمارية مدروسة ومبنية على بيانات حقيقية.\n\n"
+        "🤖 **أهلاً بك في بوت المستشار المالي V8.5** 📈\n"
+        "شريكك لاتخاذ قرارات استثمارية مدروسة ومبنية على بيانات حقيقية.\n\n"
         "━━━━━━━━━━━━━━━━━━━\n"
         "✨ **النسخة المجانية:** تمنحك استعلامات محدودة للأسعار والمؤشرات الفنية.\n"
-        "👑 **الاشتراك المدفوع:** تقارير مالية وفنية عميقة مع حسم القرار الاستثماري بدقة عالية وبدون قيود.\n"
+        "👑 **الاشتراك المدفوع:** تقارير عميقة وصناعة القرار الاستثماري بدون قيود.\n"
         "━━━━━━━━━━━━━━━━━━━\n\n"
         "👇 **الرجاء تحديد خيارك للبدء:**"
     )
@@ -152,7 +150,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "tier_premium":
         premium_msg = (
             "👑 **ميزات الاشتراك والتحليل العميق (Premium):**\n\n"
-            "• حسم القرار الاستثماري: [شراء قوي / مراقبة / بيع] مع الأسباب الفنية والمالية.\n"
+            "• حسم القرار الاستثماري: [شراء قوي / مراقبة / بيع] مع الأسباب.\n"
             "• تحديد دقيق لنقاط الدخول، الأهداف، ووقف الخسارة.\n"
             "• استعلامات مفتوحة بلا قيود على مدار الساعة.\n\n"
             f"🔑 **كود حسابك الشخصي:** `{user_id}`\n"
@@ -232,7 +230,7 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
             remaining = "مفتوح (حساب مدفوع 👑)"
 
         if user_srv == "TECH":
-            tech_status = "تشبع بيعي (فرصة شراء)" if rsi_value < 35 else "تشبع شرائي (جني أحبار)" if rsi_value > 65 else "حالة مستقرة (حياد)"
+            tech_status = "تشبع بيعي (فرصة شراء)" if rsi_value < 35 else "تشبع شرائي (جني أرباح)" if rsi_value > 65 else "حالة مستقرة (حياد)"
             trend = "اتجاه صاعد (Bullish)" if current_price > ma_50 else "اتجاه هابط (Bearish)"
             
             tech_report = (
@@ -304,7 +302,7 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Error executing analysis for {symbol}: {e}")
         await update.message.reply_text(f"⚠️ حدث خطأ أثناء التحليل التقني لسهم {symbol}.")
 
-# 4. أوامر لوحة التحكم الخاصة بالمسؤول
+# 5. أوامر لوحة التحكم الخاصة بالمسؤول
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != ADMIN_ID:
@@ -323,10 +321,10 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "💼 **لوحة تحكم المسؤول (Admin Panel)**\n"
         "━━━━━━━━━━━━━━━━━━━\n"
         f"📊 **إجمالي المستخدمين في البوت:** {total_users}\n"
-        f"👑 **عدد المشتركين المدفوعين (Premium):** {premium_users}\n"
+        f"👑 **عدد المشتركين المدفوعين:** {premium_users}\n"
         "━━━━━━━━━━━━━━━━━━━\n"
         "💡 **لتفعيل مستخدم جديد ارسل:**\n"
-        "`/activate user_id`\n\n"
+        "`/activate user_id`\n"
         "💡 **لإلغاء تفعيل مستخدم ارسل:**\n"
         "`/deactivate user_id`"
     )
@@ -336,11 +334,9 @@ async def activate_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != ADMIN_ID:
         return
-
     if not context.args:
-        await update.message.reply_text("⚠️ مثال:\n`/activate 123456789`")
+        await update.message.reply_text("⚠️ مثال: `/activate 12345678`")
         return
-
     try:
         target_id = int(context.args[0])
         set_premium_status(target_id, 1)
@@ -356,11 +352,9 @@ async def deactivate_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != ADMIN_ID:
         return
-
     if not context.args:
-        await update.message.reply_text("⚠️ مثال:\n`/deactivate 123456789`")
+        await update.message.reply_text("⚠️ مثال: `/deactivate 12345678`")
         return
-
     try:
         target_id = int(context.args[0])
         set_premium_status(target_id, 0)
@@ -368,17 +362,22 @@ async def deactivate_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("❌ خطأ: يرجى إدخال ID صحيح.")
 
-def main():
-    # 1. تشغيل سيرفر الويب المخفي في Thread منفصل لخدمة Render Web Service
-    web_thread = threading.Thread(target=run_web_server, daemon=True)
-    web_thread.start()
-
-    # 2. إعداد مجدول المهام لتصفير العداد يومياً الساعة 12:00 منتصف الليل
+# دالة تشغيل سيرفر الويب وسحب التحديثات في آن واحد
+async def main():
+    # 1. إعداد مجدول المهام
     scheduler = BackgroundScheduler(timezone="UTC")
     scheduler.add_job(reset_daily_usage, 'cron', hour=0, minute=0)
     scheduler.start()
 
-    # 3. تشغيل البوت الأساسي
+    # 2. بدء سيرفر الويب المخفي
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), PingServer)
+    logging.info(f"🌐 تم تشغيل سيرفر الويب المدمج على المنفذ: {port}")
+    
+    # نجعل السيرفر يعمل بشكل غير متزامن لتجنب حجز الـ Thread
+    server.timeout = 0.1
+    
+    # 3. بناء تطبيق البوت
     application = Application.builder().token(TELEGRAM_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("admin", admin_panel))
@@ -386,9 +385,34 @@ def main():
     application.add_handler(CommandHandler("deactivate", deactivate_user))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fetch_and_analyze))
+
+    # تهيئة البوت
+    await application.initialize()
+    await application.start()
     
-    print("البوت الاحترافي يعمل الآن بكفاءة مع سيرفر الويب على رندر...")
-    application.run_polling()
+    # بدء سحب الرسائل يدوياً لمنع أي تضارب في الـ Loops
+    updater = application.updater
+    await updater.start_polling()
+
+    logging.info("🚀 البوت يعمل الآن بكفاءة كاملة على ريندر...")
+
+    # تشغيل حلقة (Loop) مستمرة تجمع بين معالجة طلبات الويب وسحب رسائل البوت
+    try:
+        while True:
+            server.handle_request()  # معالجة طلبات الويب اللحظية من ريندر (تجنب الخمول)
+            await asyncio.sleep(1)   # إعطاء مساحة للبوت لمعالجة الرسائل القادمة
+    except (KeyboardInterrupt, SystemExit):
+        pass
+    finally:
+        await updater.stop()
+        await application.shutdown()
 
 if __name__ == '__main__':
-    main()
+    # تشغيل الحلقة البرمجية الآمنة
+    try:
+        asyncio.run(main())
+    except RuntimeError:
+        # لتفادي أي مشاكل في حال كان هناك Event Loop نشط مسبقاً
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(main())
