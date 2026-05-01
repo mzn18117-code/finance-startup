@@ -34,7 +34,6 @@ TIER1_LIMIT = 20
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    # جدول المستخدمين المحدث بنظام المستويات
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
@@ -43,7 +42,6 @@ def init_db():
             tier_level INTEGER DEFAULT 0
         )
     ''')
-    # جدول المحفظة الافتراضية (للمستوى 2 و 3)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS portfolios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,11 +51,10 @@ def init_db():
             buy_price REAL
         )
     ''')
-    # فحص إذا كان العمود القديم exists وتعديله (migration بسيط إن لزم)
     try:
         cursor.execute("ALTER TABLE users ADD COLUMN tier_level INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
-        pass # العمود موجود بالفعل
+        pass 
     conn.commit()
     conn.close()
 
@@ -101,11 +98,11 @@ def reset_daily_usage():
         cursor.execute("UPDATE users SET usage_count = 0 WHERE tier_level < 2")
         conn.commit()
         conn.close()
-        logging.info("🔄 تم تصفير عداد الاستخدام اليومي للمستويات المجانية والمستوى الأول.")
+        logging.info("🔄 تم تصفير عداد الاستخدام اليومي بنجاح.")
     except Exception as e:
         logging.error(f"Error resetting daily usage: {e}")
 
-# دوال إدارة المحفظة الافتراضية للمشتركين
+# دوال إدارة المحفظة الافتراضية
 def add_to_portfolio(user_id, symbol, quantity, buy_price):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -174,7 +171,7 @@ async def auto_post_to_channel(context: ContextTypes.DEFAULT_TYPE):
         ma_50 = float(ma_50_series.iloc[-1]) if not ma_50_series.empty else current_price
 
         prompt = f"""
-        أنت مستشار مالي معتمد. حلل سهم {symbol} وقدم إجابة واضحة وموثوقة لمتابعي القناة:
+        أنت مستشار مالي معتمد. حلل سهم {symbol} وقدم إجابة واضحة لمتابعي القناة:
         - السعر الحالي: {current_price:.2f}
         - مؤشر RSI: {rsi_value:.2f}
         - المتوسط المتحرك 50 يوم: {ma_50:.2f}
@@ -210,10 +207,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     register_or_update_user(user_id, username)
     
     welcome_msg = (
-        "🤖 **أهلاً بك في بوت المستشار المالي V9.0** 📈\n"
-        "شريكك لاتخاذ قرارات استثمارية مدروسة مبنية على الذكاء الاصطناعي.\n\n"
+        "🤖 **مرحباً بك في StockHunter AI V9.5** 📈\n"
+        "**مستشارك المالي الذكي لإدارة وتحليل الأسهم والأسواق المالية**\n\n"
         "━━━━━━━━━━━━━━━━━━━\n"
-        "👇 **الرجاء تحديد خيارك للبدء:**"
+        "💡 **كيف يعمل البوت؟**\n"
+        "يقوم البوت بالربط المباشر مع الأسواق المالية العالمية والخليجية لجلب أدق البيانات اللحظية، "
+        "ثم يدمجها مع مؤشرات التحليل الفني والمالي (مثل RSI والـ P/E)، "
+        "لتتم معالجتها بواسطة محرك ذكاء اصطناعي متقدم يمنحك قرارات تداول حاسمة وخطة استثمار واضحة.\n\n"
+        "👑 **مزايا الاشتراك والخدمات الحصرية:**\n"
+        "• **تقارير مالية معمقة:** أهداف دخول وخروج دقيقة مع وقف الخسارة الصارم.\n"
+        "• **محفظة رقمية افتراضية:** تتبع أداء أسهمك وأرباحك اللحظية تلقائياً.\n"
+        "• **تحليلات VIP:** صياغة وتقييم استثماري عالي المستوى مخصص للصفقات الكبرى.\n"
+        "• **استعلامات مفتوحة:** قدرة غير محدودة على سحب وتحليل البيانات يومياً.\n"
+        "━━━━━━━━━━━━━━━━━━━\n"
+        "👇 **يرجى اختيار وجهتك المفضلة من الأزرار أدناه:**"
     )
     keyboard = [
         [InlineKeyboardButton("🆓 استخدام النسخة المجانية", callback_data="tier_free")],
@@ -276,7 +283,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🔬 تحليل مالي وفني عميق وصنع القرار (AI)", callback_data="srv_deep")]
         ]
         
-        # ميزات المحفظة متاحة فقط للمشتركين في باقة الـ 50$ (tier 2) فما فوق
         if tier_level >= 2:
             keyboard.append([InlineKeyboardButton("📂 استعراض محفظتي الاستثمارية", callback_data="port_view")])
             keyboard.append([InlineKeyboardButton("➕ إضافة سهم للمحفظة", callback_data="port_add")])
@@ -403,7 +409,6 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     user_data = get_user(user_id)
     usage_count, tier_level = user_data[0], user_data[1]
 
-    # فحص حدود الاستخدام للباقات
     if tier_level == 0 and usage_count >= FREE_LIMIT:
         paywall_msg = "🔒 **انتهت محاولاتك المجانية اليوم (3 محاولات).**"
         keyboard = [[InlineKeyboardButton("💎 تفعيل الباقة المدفوعة", callback_data="tier_premium_info")]]
@@ -415,7 +420,6 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         await context.bot.send_message(chat_id=user_id, text=paywall_msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
 
-    # معالجة إضافة بيانات للمحفظة للمشتركين (tier 2 + 3)
     if user_id in user_context and user_context[user_id].get("state") == "AWAITING_PORTFOLIO_DATA" and not direct_symbol:
         try:
             parts = update.message.text.split(",")
@@ -458,7 +462,6 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
         user_srv = user_context[user_id]["service"]
         
-        # زيادة عداد الاستخدام فقط إذا لم يكن المشترك Tier 2 أو 3 (مفتوح)
         if tier_level < 2:
             increment_usage(user_id)
             remaining = (FREE_LIMIT if tier_level == 0 else TIER1_LIMIT) - (usage_count + 1)
@@ -482,7 +485,6 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             await context.bot.send_message(chat_id=user_id, text=tech_report, parse_mode="Markdown")
 
         elif user_srv == "DEEP":
-            # تخصيص التحليل العميق حسب المستوى
             if tier_level == 0:
                 await context.bot.send_message(chat_id=user_id, text="⚠️ هذه الميزة متاحة فقط للمشتركين Premium.")
                 return
@@ -502,7 +504,6 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             except Exception:
                 pass
 
-            # باقة VIP (tier 3) تحصل على أسلوب تحليل مالي قوي جداً وحاسم
             if tier_level == 3:
                 prompt = f"""
                 أنت خبير مالي أول ومحلل مخاطر للصفقات الكبرى (VIP). حلل سهم {symbol} بناءً على الآتي:
@@ -511,7 +512,7 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                 - عائد التوزيعات: {div_yield:.2f}%
                 - مؤشر RSI: {rsi_value:.2f} | المتوسط المتحرك 50 يوم: {ma_50:.2f}
                 
-                اكتب التقرير باللغة العربية كالتالي (بدون نجوم أو شرطات سفلية تماماً):
+                اكتب التقرير باللغة العربية كالتالي (تجنب النجوم والشرطات السفلية تماماً):
                 1. القرار الحاسم لـ VIP (شراء قوي جداً أو شراء حذر أو مراقبة أو بيع فوري).
                 2. الأسباب المالية والفنية المتقدمة بدقة.
                 3. أهداف التداول المتقدمة (الدخول، الهدف الأول، الهدف الثاني، وقف الخسارة الصارم).
@@ -584,8 +585,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "━━━━━━━━━━━━━━━━━━━\n"
         "💡 **لتفعيل مستخدم أو تغيير باقته أرسل:**\n"
         "`/activate user_id tier_level`\n"
-        "* المستويات المتاحة (0 مجاني، 1 باقة $20، 2 باقة $50، 3 باقة $99).\n"
-        "**مثال:** لتفعيل VIP أرسل: `/activate 12345678 3`"
+        "* المستويات المتاحة (0 مجاني، 1 باقة $20، 2 باقة $50، 3 باقة $99)."
     )
     await update.message.reply_text(admin_msg, parse_mode="Markdown")
 
