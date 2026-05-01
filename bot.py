@@ -1,3 +1,8 @@
+تفضل الكود كاملًا بعد تحديثه وإضافة حسابك الخاص ليتمكن المشتركون من مراسلتك عليه مباشرة.
+
+كل ما عليك فعله هو نسخ الكود بالكامل واستبدال محتوى ملف `bot.py` به في GitHub:
+
+```python
 import os
 import sqlite3
 import logging
@@ -118,7 +123,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     register_or_update_user(user_id, username)
     
     welcome_msg = (
-        "🤖 **أهلاً بك في بوت المستشار المالي V8.5** 📈\n"
+        "🤖 **أهلاً بك في بوت المستشار المالي V8.6** 📈\n"
         "شريكك لاتخاذ قرارات استثمارية مدروسة ومبنية على بيانات حقيقية.\n\n"
         "━━━━━━━━━━━━━━━━━━━\n"
         "✨ **النسخة المجانية:** تمنحك استعلامات محدودة للأسعار والمؤشرات الفنية.\n"
@@ -131,7 +136,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("💎 تفاصيل الاشتراك المدفوع", callback_data="tier_premium")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(welcome_msg, reply_markup=reply_markup, parse_mode="Markdown")
+    
+    if update.message:
+        await update.message.reply_text(welcome_msg, reply_markup=reply_markup, parse_mode="Markdown")
+    elif update.callback_query:
+        await update.callback_query.message.reply_text(welcome_msg, reply_markup=reply_markup, parse_mode="Markdown")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -150,11 +159,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "tier_premium":
         premium_msg = (
             "👑 **ميزات الاشتراك والتحليل العميق (Premium):**\n\n"
-            "• حسم القرار الاستثماري: [شراء قوي / مراقبة / بيع] مع الأسباب.\n"
+            "• حسم القرار الاستثماري بدقة عالية [شراء قوي / مراقبة / بيع] مع الأسباب الفنية والمالية.\n"
             "• تحديد دقيق لنقاط الدخول، الأهداف، ووقف الخسارة.\n"
             "• استعلامات مفتوحة بلا قيود على مدار الساعة.\n\n"
-            f"🔑 **كود حسابك الشخصي:** `{user_id}`\n"
-            "📩 **للاشتراك الآن:** أرسل كود حسابك للدعم لتفعيل باقتك."
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "💳 **أسعار الاشتراك:**\n"
+            "• اشتراك شهري: 20$ فقط\n\n"
+            "💰 **طرق الدفع المتاحة:**\n"
+            "• تحويل بنكي / PayPal / USDT\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            f"🔑 **كود حسابك الشخصي:** `{user_id}`\n\n"
+            "📩 **طريقة التفعيل:**\n"
+            "1. قم بتحويل مبلغ الاشتراك عبر الوسيلة المفضلة لديك.\n"
+            "2. اضغط على رابط الدعم أدناه وأرسل (إيصال التحويل + كود حسابك الشخصي).\n\n"
+            "⚠️ [اضغط هنا لمراسلة الدعم وتفعيل اشتراكك](https://t.me/ShadowMix_Global)"
         )
         keyboard = [[InlineKeyboardButton("🔙 العودة", callback_data="back_home")]]
         await query.edit_message_text(premium_msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
@@ -374,7 +392,6 @@ async def main():
     server = HTTPServer(("0.0.0.0", port), PingServer)
     logging.info(f"🌐 تم تشغيل سيرفر الويب المدمج على المنفذ: {port}")
     
-    # نجعل السيرفر يعمل بشكل غير متزامن لتجنب حجز الـ Thread
     server.timeout = 0.1
     
     # 3. بناء تطبيق البوت
@@ -390,17 +407,15 @@ async def main():
     await application.initialize()
     await application.start()
     
-    # بدء سحب الرسائل يدوياً لمنع أي تضارب في الـ Loops
     updater = application.updater
     await updater.start_polling()
 
     logging.info("🚀 البوت يعمل الآن بكفاءة كاملة على ريندر...")
 
-    # تشغيل حلقة (Loop) مستمرة تجمع بين معالجة طلبات الويب وسحب رسائل البوت
     try:
         while True:
-            server.handle_request()  # معالجة طلبات الويب اللحظية من ريندر (تجنب الخمول)
-            await asyncio.sleep(1)   # إعطاء مساحة للبوت لمعالجة الرسائل القادمة
+            server.handle_request()
+            await asyncio.sleep(1)
     except (KeyboardInterrupt, SystemExit):
         pass
     finally:
@@ -408,11 +423,10 @@ async def main():
         await application.shutdown()
 
 if __name__ == '__main__':
-    # تشغيل الحلقة البرمجية الآمنة
     try:
         asyncio.run(main())
     except RuntimeError:
-        # لتفادي أي مشاكل في حال كان هناك Event Loop نشط مسبقاً
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(main())
+```
