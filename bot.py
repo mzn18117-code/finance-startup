@@ -1,4 +1,3 @@
-
 import os
 import sqlite3
 import logging
@@ -246,7 +245,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_context[user_id]["state"] = "WAITING_PAYMENT_PROOF"
 
         usdt_addr = "TXxxxxxxxxxxxxxxxxxxxxxxxx"
-        pp_link = "https://paypal.me/yourname"
+        pp_link = "[https://paypal.me/yourname](https://paypal.me/yourname)"
 
         if method == "usdt":
             msg = f"💰 **الدفع عبر USDT**\n\nالمبلغ: `${PRICES[tier]}`\n\nالعنوان (TRC20):\n`{usdt_addr}`\n\n📸 بعد إتمام التحويل، أرسل صورة الإثبات مباشرة هنا."
@@ -518,4 +517,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-```
