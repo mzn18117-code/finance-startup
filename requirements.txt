@@ -1,6 +1,6 @@
 python-telegram-bot==20.8
-google-genai==0.1.1
-yfinance>=0.2.38
-apscheduler==3.10.4
-requests>=2.31.0
-urllib3>=2.0.0
+google-genai
+yfinance
+apscheduler
+requests
+urllib3
