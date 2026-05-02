@@ -1,28 +1,14 @@
-لقد قمت بإعادة تصميم الكود بالكامل بناءً على التعديلات الاحترافية التي طلبتها. تم تحديث الهيكلية لتشمل **تدرج الباقات الجديد**، **الأزرار الذكية والذهبية**، و**الرسائل التسويقية الذكية** لجذب المستخدمين للاشتراك.
+هذا الخطأ يحدث لأنك قمت بنسخ رسالتي التوضيحية السابقة (النص العربي الترحيبي) ولصقتها داخل ملف `bot.py` في GitHub مع الكود البرمجي بالخطأ.
+
+بايثون يحاول قراءة النص العربي ككود برمجي، وعندما يجد الفاصلة العربية (`،`) يظهر لك خطأ `SyntaxError`.
 
 ---
 
-### 🛠️ ما تم تعديله وتطويره بالكامل:
+### 🛠️ الحل النهائي والمباشر
 
-#### 1️⃣ هيكلة الاشتراكات الجديدة:
-* **🆓 المجاني (Free):** 3 تحليلات يومياً، تقرير مختصر، وبدون أهداف أو تنبيهات.
-* **👑 باقة VIP ($15/شهرياً):** تحليلات غير محدودة، تقارير كاملة (أهداف + دخول + وقف خسارة)، إشارات فورية، تحليل العملات الرقمية.
-* **🚀 باقة PRO / Elite ($49/شهرياً):** كافة المزايا + إدارة المحفظة وحاسبة المخاطر والتنبيهات المخصصة.
+يجب أن يحتوي ملف `bot.py` على **الكود البرمجي فقط** بدون أي نصوص عربية خارج الكود.
 
-#### 2️⃣ الأزرار الذكية والمتدرجة:
-* عند الدخول لأي سوق، ستظهر للمستخدم خيارات متقدمة: **(🔥 فرص اليوم | 📈 أفضل صاعد | 📉 أفضل هابط | 🔍 ابحث عن سهم | 📰 أخبار السوق)**.
-* إضافة **قسم الخدمات الشخصية**: **(⭐ المفضلة | 🔔 تنبيهاتي | 💼 محفظتي | 📊 آخر تحليلاتي)**.
-* إضافة **الزر الذهبي للمشتركين المميزين**: **(🔥 أفضل فرصة الآن)**.
-
-#### 3️⃣ أسلوب التسويق الذكي (Conversion Optimization):
-* عندما يحاول مستخدم مجاني الدخول لميزات باقة أعلى، يظهر له البوت رسائل تسويقية ذكية ومغرية بدلاً من الرفض التقليدي، مثل:
-  > *🚨 تم اكتشاف فرصة قوية على NVDA! الهدف: +6%، وقف الخسارة جاهز. 🔒 متاح لأعضاء VIP فقط.*
-
----
-
-### 📋 الكود البرمجي المحدث بالكامل (`bot.py`)
-
-انسخ هذا الكود بالكامل واستبدل به محتوى الملف في **GitHub**:
+امسح كل شيء موجود حالياً في ملف `bot.py` على **GitHub**، وانسخ الكود التالي بالكامل والصقه هناك:
 
 ```python
 import os
@@ -31,7 +17,7 @@ import logging
 import asyncio
 import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
-import yfinance as yf
+import yfinance as f
 from google import genai
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
@@ -44,10 +30,9 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 ADMIN_ID = 7763725732
 CHANNEL_ID = "@StockHunter_AI"
 
-# أسعار الباقات الجديدة
 PRICES = {
-    1: 15, # VIP
-    2: 49  # PRO / Elite
+    1: 15, 
+    2: 49  
 }
 
 if not TELEGRAM_TOKEN or not GEMINI_API_KEY:
@@ -58,7 +43,6 @@ DB_FILE = "bot_data.db"
 
 FREE_LIMIT = 3
 
-# تهيئة قاعدة البيانات المحلية مؤقتاً قبل الربط بالخارجية
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -101,7 +85,6 @@ def init_db():
 
 init_db()
 
-# دوال معالجة البيانات
 def get_user(user_id):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -157,7 +140,6 @@ def get_favorites(user_id):
     conn.close()
     return [r[0] for r in rows]
 
-# سيرفر Ping لـ Render
 class PingServer(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -167,7 +149,6 @@ class PingServer(BaseHTTPRequestHandler):
 
 user_context = {}
 
-# 🏁 الصفحة الرئيسية المثالية
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     username = update.effective_user.username or "مستخدم"
@@ -194,7 +175,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.callback_query.message.reply_text(main_menu_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
-# 🎮 معالجة ضغط الأزرار بالكامل
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -207,12 +187,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = get_user(user_id)
     tier_level = user_data[1] if user_data else 0
 
-    # الأسواق
     if data.startswith("mkt_"):
         market = data.replace("mkt_", "").upper()
         user_context[user_id]["market"] = market
 
-        # عرض أزرار السوق المتقدمة والمتدرجة
         market_names = {"US": "🇺🇸 السوق الأمريكي", "SA": "🇸🇦 السوق السعودي", "GULF": "🇦🇪 السوق الخليجي", "EGYPT": "🇪🇬 السوق المصري", "GOLD": "🥇 الذهب", "OIL": "🛢 النفط", "CRYPTO": "🪙 العملات الرقمية"}
         msg = f"📌 **{market_names.get(market, market)}**\n\nاختر من الخدمات المتاحة للبدء:"
         
@@ -290,7 +268,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="premium_plans")]]), parse_mode="Markdown")
 
     elif data.startswith("opt_"):
-        # التعامل مع أزرار الأسواق
         action = data.split("_")[1]
         market = data.split("_")[2]
         
@@ -329,7 +306,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         else:
             await query.edit_message_text("📂 جاري جلب بيانات محفظتك الشخصية...")
-            # وظيفة استعراض المحفظة (ستعمل بالكامل)
 
     elif data.startswith("sym_direct_"):
         symbol = data.replace("sym_direct_", "")
@@ -339,7 +315,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.delete()
         await start(update, context)
 
-# 🧠 تحليل الذكاء الاصطناعي وجلب بيانات السوق
 async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, direct_symbol=None):
     user_id = update.effective_user.id
     user_data = get_user(user_id)
@@ -358,7 +333,7 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     loading = await context.bot.send_message(chat_id=user_id, text=f"⏳ جاري فحص وتحليل `{symbol}`...")
 
     try:
-        ticker = yf.Ticker(symbol)
+        ticker = f.Ticker(symbol)
         history = ticker.history(period="1mo")
         if history.empty:
             await context.bot.delete_message(chat_id=user_id, message_id=loading.message_id)
@@ -411,7 +386,6 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         logging.error(f"Analysis error: {e}")
         await context.bot.send_message(chat_id=user_id, text="⚠️ حدث خطأ أثناء التحليل.")
 
-# جلب الفرص الساخنة للأسواق
 async def fetch_market_insights(update: Update, context: ContextTypes.DEFAULT_TYPE, market, info_type):
     user_id = update.effective_user.id
     prompt = f"أنت محلل مالي. اعط تقريراً كاملاً ومدروساً لـ {info_type} في السوق {market} باللغة العربية دون نجوم."
@@ -424,7 +398,6 @@ async def fetch_market_insights(update: Update, context: ContextTypes.DEFAULT_TY
         logging.error(f"Insight error: {e}")
         await context.bot.send_message(chat_id=user_id, text="⚠️ تعذر استخراج تقارير السوق حالياً.")
 
-# جلب أفضل فرصة ذكاء اصطناعي للـ VIP
 async def get_best_opportunity_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     prompt = (
@@ -440,7 +413,6 @@ async def get_best_opportunity_ai(update: Update, context: ContextTypes.DEFAULT_
         logging.error(f"Opportunity Error: {e}")
         await context.bot.send_message(chat_id=user_id, text="⚠️ تعذر استخراج الفرصة حالياً.")
 
-# توجيه الرسائل النصية
 async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id in user_context and user_context[user_id].get("state") == "AWAITING_SYMBOL_INPUT":
@@ -449,7 +421,6 @@ async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await fetch_and_analyze(update, context)
 
-# التعامل مع الصور وإثباتات الدفع
 async def photo_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id in user_context and user_context[user_id].get("state") == "WAITING_PAYMENT_PROOF":
@@ -475,7 +446,6 @@ def main():
 
     application = Application.builder().token(TELEGRAM_TOKEN).build()
     
-    # ربط الأوامر بالبث والتطبيقات
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.PHOTO, photo_router))
