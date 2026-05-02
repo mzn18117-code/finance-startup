@@ -211,9 +211,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if tier_level == 0:
             promo_msg = (
                 "🚨 **تم اكتشاف فرصة قوية جداً الآن!**\n"
-                "• **الأصل:** `NVDA`\n"
-                "• **الهدف المتوقع:** `+6.8%`\n"
-                "• **وقف الخسارة:** جاهز ومحدد بدقة\n\n"
                 "🔒 هذه الإشارة متاحة حصرياً لأعضاء **VIP** و **PRO**.\n"
                 "اضغط أدناه للترقية والوصول للصفقة فوراً!"
             )
@@ -226,16 +223,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "premium_plans":
         plans_msg = (
             "👑 **باقات الاشتراك المميز في StockHunter AI**\n\n"
-            "**1️⃣ باقة VIP (الأكثر مبيعاً) - $15 شهرياً**\n"
-            "• تحليلات وتقارير غير محدودة\n"
-            "• الأهداف السعرية + نقاط الدخول + وقف الخسارة الصارم\n"
-            "• ميزة 'أفضل فرصة الآن' للذكاء الاصطناعي\n"
-            "• إشارات يومية للأسواق والعملات الرقمية\n\n"
-            "**2️⃣ باقة PRO / Elite - $49 شهرياً**\n"
-            "• كافة مزايا باقة VIP بالكامل\n"
-            "• إدارة المحفظة وحساب المخاطر\n"
-            "• تنبيهات مخصصة فورية على الأسعار\n"
-            "• صفقات وتحليلات يومية حصرية\n\n"
             "👇 اختر باقتك المفضلة للدفع الآن:"
         )
         keyboard = [
@@ -304,8 +291,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "pers_portfolio":
         if tier_level < 2:
             await query.edit_message_text(
-                "🚨 **هذه الميزة متاحة للمشتركين PRO فقط!**\n\n"
-                "تمكنك باقة PRO من تتبع محفظتك وحساب المخاطر لصفقاتك بدقة.",
+                "🚨 **هذه الميزة متاحة للمشتركين PRO فقط!**",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🚀 الترقية لباقة PRO", callback_data="premium_plans")], [InlineKeyboardButton("🔙 العودة", callback_data="back_home")]]),
                 parse_mode="Markdown"
             )
@@ -333,11 +319,6 @@ async def activate_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         tier_names = {0: "مجاني 🆓", 1: "VIP 👑", 2: "PRO / Elite 🚀"}
         await update.message.reply_text(f"✅ تم تفعيل باقة **{tier_names.get(tier, 'غير معروفة')}** للمستخدم `{target_id}` بنجاح!")
-        
-        await context.bot.send_message(
-            chat_id=target_id, 
-            text=f"🎉 تهانينا! تم تفعيل اشتراكك في باقة **{tier_names.get(tier)}** بنجاح. استمتع بكافة المزايا الآن!"
-        )
     except (IndexError, ValueError):
         await update.message.reply_text("⚠️ الصيغة خاطئة. استخدم:\n`/activate [ID] [Level]`", parse_mode="Markdown")
 
@@ -347,70 +328,64 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     usage_count, tier_level = user_data[0], user_data[1]
 
     if tier_level == 0 and usage_count >= FREE_LIMIT:
-        promo = (
-            "🚨 **انتهت تحليلاتك المجانية الـ 3 اليوم.**\n"
-            "للحصول على تحليلات غير محدودة + أهداف سعرية ووقف خسارة دقيق:\n\n"
-            "🔒 **اشترك الآن في باقة VIP.**"
-        )
+        promo = "🚨 **انتهت تحليلاتك المجانية الـ 3 اليوم. اشترك الآن في باقة VIP للحصول على تحليلات غير محدودة.**"
         await context.bot.send_message(chat_id=user_id, text=promo, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("👑 اشترك في VIP", callback_data="premium_plans")]]), parse_mode="Markdown")
         return
 
     symbol = direct_symbol.upper().strip() if direct_symbol else update.message.text.upper().strip()
-    loading = await context.bot.send_message(chat_id=user_id, text=f"⏳ جاري فحص وتحليل `{symbol}` بعمق...")
+    loading = await context.bot.send_message(chat_id=user_id, text=f"⏳ جاري سحب بيانات الشارت الحية لـ `{symbol}` وقراءتها...")
 
     try:
         ticker = yf.Ticker(symbol)
-        # جلب بيانات فنية حقيقية لمدة شهر لدراسة السوق
         history = ticker.history(period="1mo")
         if history.empty:
             history = ticker.history(period="1wk")
             
         if history.empty:
             await context.bot.delete_message(chat_id=user_id, message_id=loading.message_id)
-            await context.bot.send_message(chat_id=user_id, text=f"❌ الرمز `{symbol}` غير متاح أو غير موجود حالياً.")
+            await context.bot.send_message(chat_id=user_id, text=f"❌ الرمز `{symbol}` غير موجود حالياً في السوق.")
             return
 
-        # استخراج المتغيرات المالية الدقيقة
+        # 🛑 هنا نأخذ جدول الأسعار الحقيقي بالكامل ونحوله إلى نص يقرأه الذكاء الاصطناعي
+        # يشمل السعر عند الافتتاح، الإغلاق، أعلى سعر، أدنى سعر، وحجم التداول لكل يوم في آخر شهر.
+        price_data_str = ""
+        for index, row in history.tail(20).iterrows():
+            price_data_str += f"Date: {index.date()} | Open: {row['Open']:.2f} | High: {row['High']:.2f} | Low: {row['Low']:.2f} | Close: {row['Close']:.2f} | Volume: {int(row['Volume'])}\n"
+
         current_p = float(history['Close'].dropna().iloc[-1])
-        highest_30 = float(history['High'].dropna().max())
-        lowest_30 = float(history['Low'].dropna().min())
-        first_p = float(history['Close'].dropna().iloc[0])
-        change_30 = ((current_p - first_p) / first_p) * 100
 
-        # إنشاء أمر صارم ومبني على البيانات
+        # صياغة تعليمات تجبر الذكاء الاصطناعي على التحليل الرقمي و اتخاذ القرار
         prompt = f"""
-        أنت مستشار مالي ومحلل فني محترف وخبير في الأسواق المالية.
-        حلل الأصل المالي التالي بناءً على البيانات الدقيقة المرفقة:
-        - رمز السهم: {symbol}
-        - السعر الحالي: {current_p:.2f}
-        - أعلى سعر في 30 يوم: {highest_30:.2f}
-        - أدنى سعر في 30 يوم: {lowest_30:.2f}
-        - التغير في آخر 30 يوم: {change_30:+.2f}%
+        أنت محلل أسواق مالية محترف ومستشار صناديق استثمارية.
+        أمامك جدول بيانات الشموع الحقيقية اليومية لآخر شهر لـ رمز: ({symbol}):
+        
+        {price_data_str}
 
-        المطلوب منك تحليل عميق ومباشر باللغة العربية ودون استخدام النجوم:
-        1. الاتجاه العام المتوقع: هل السعر سيهبط أم سيرتفع؟ ولماذا؟
-        2. قرار مالي واضح ومباشر: (شراء، بيع، أو انتظار).
-        3. المستويات الفنية: حدد بدقة سعر الدخول المناسب، والهدف الأول، ووقف الخسارة الصارم.
-        كن حازماً واكتب كلاماً مبنياً على الأرقام وليس جملاً إنشائية عامة.
+        المطلوب منك دراسة الأرقام السابقة وتحليلها، ثم كتابة تقرير واضح باللغة العربية دون استخدام النجوم كالتالي:
+        
+        1. اتجاه السهم الفني: (هل هو في ترند صاعد، هابط، أم عرضي) وبناءً على أي أرقام من الجدول؟
+        2. التوقع والقرار المالي المباشر: هل السعر سيهبط أم سيرتفع في الأيام القادمة؟ وما هو قرارك الفعلي (شراء الآن، بيع، أو انتظار وتجنب)؟
+        3. المستويات الرقمية الدقيقة:
+           - سعر الدخول الأنسب.
+           - الهدف الأول والهدف الثاني.
+           - نقطة وقف الخسارة الصارمة (بناءً على كسر أدنى دعم في الجدول).
+        
+        اكتب كلاماً دقيقاً مبنياً بالكامل على البيانات المرفقة أعلاه فقط.
         """
 
         res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
         ai_text = res.text
 
-        # تنسيق التقرير النهائي للمستخدم
         report = (
-            f"📊 **التحليل الفني المعمق لـ:** `{symbol}`\n"
-            f"💰 **السعر الحالي:** {current_p:.2f}\n"
-            f"🔝 **أعلى سعر (30 يوم):** {highest_30:.2f}\n"
-            f"🔙 **أدنى سعر (30 يوم):** {lowest_30:.2f}\n"
-            f"📈 **أداء الشهر:** {change_30:+.2f}%\n"
+            f"📊 **تحليل رقمي حقيقي لـ:** `{symbol}`\n"
+            f"💰 **آخر سعر إغلاق حقيقي:** {current_p:.2f}\n"
             "━━━━━━━━━━━━━━━━━━━\n"
-            f"🤖 **توصية وقرار الذكاء الاصطناعي:**\n\n{ai_text}\n"
+            f"🤖 **تقرير وقرار الذكاء الاصطناعي بناءً على بيانات الشارت:**\n\n{ai_text}\n"
         )
 
         if tier_level == 0:
             increment_usage(user_id)
-            report += "━━━━━━━━━━━━━━━━━━━\n🔒 للوصول الدائم للتحليلات الحصرية، اشترك في باقات VIP."
+            report += "━━━━━━━━━━━━━━━━━━━\n🔒 اشترك في باقات VIP لمتابعة كافة التحليلات العميقة فوراً."
 
         add_to_favorites(user_id, symbol)
         keyboard = [[InlineKeyboardButton("🔝 العودة للرئيسية", callback_data="back_home")]]
@@ -420,14 +395,11 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     except Exception as e:
         logging.error(f"Analysis error: {e}", exc_info=True)
         await context.bot.delete_message(chat_id=user_id, message_id=loading.message_id)
-        await context.bot.send_message(chat_id=user_id, text=f"⚠️ حدث خطأ في التحليل: {str(e)}")
+        await context.bot.send_message(chat_id=user_id, text=f"⚠️ حدث خطأ في استخراج البيانات: {str(e)}")
 
 async def fetch_market_insights(update: Update, context: ContextTypes.DEFAULT_TYPE, market, info_type):
     user_id = update.effective_user.id
-    prompt = f"""
-    أنت محلل مالي أول. اعط تقريراً عميقاً ومباشراً حول {info_type} في السوق {market} باللغة العربية ودون استخدام أي نجوم.
-    حدد الأسهم أو الأصول المتوقع ارتفاعها أو هبوطها بناءً على معطيات السوق الحالية، مع ذكر أرقام مستهدفة وقرارات واضحة.
-    """
+    prompt = f"أنت محلل مالي أول. اعط تقريراً عميقاً ومباشراً حول {info_type} في السوق {market} باللغة العربية ودون استخدام أي نجوم (بحد أقصى 500 كلمة)."
     try:
         res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
         ai_text = res.text
@@ -440,13 +412,7 @@ async def fetch_market_insights(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def get_best_opportunity_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    prompt = """
-    أنت مدير محفظة استثمارية وصناديق تحوط. حدد فرصة استثمارية واحدة حقيقية وجاهزة للدخول الفوري في الأسواق العالمية أو العملات الرقمية.
-    اكتب تقريراً باللغة العربية تماماً دون استخدام نجوم يتضمن بدقة:
-    1. رمز الأصل وسعره الحالي.
-    2. الاتجاه القادم بدقة (لماذا سيرتفع).
-    3. سعر الدخول الدقيق، الهدف الأول، الهدف الثاني، ووقف الخسارة الصارم.
-    """
+    prompt = "أنت مدير محفظة استثمارية. حدد فرصة استثمارية واحدة حقيقية وجاهزة للدخول الفوري. اكتب تقريراً باللغة العربية تماماً دون استخدام نجوم يشمل: الأصل، سعر الدخول، الأهداف، وقف الخسارة."
     try:
         res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
         ai_text = res.text
@@ -459,17 +425,7 @@ async def get_best_opportunity_ai(update: Update, context: ContextTypes.DEFAULT_
 
 async def post_daily_opportunities(context: ContextTypes.DEFAULT_TYPE = None):
     logging.info("بدء جلب الفرص اليومية لإرسالها للقناة...")
-    prompt = """
-    أنت مستشار مالي ومحلل فني خبير. حدد 5 فرص استثمارية ساخنة ومتنوعة لليوم من أسواق متعددة: 
-    (مثل: سهم أمريكي، سهم سعودي، عملة رقمية، الذهب، والنفط). 
-    لكل فرصة، حدد الآتي باللغة العربية بأسلوب احترافي ودون استخدام النجوم:\n
-    1. اسم الأصل/الأداة المالية\n
-    2. سبب اختيار الفرصة الفني والمالي\n
-    3. سعر الدخول المتوقع\n
-    4. الهدف الأول والهدف الثاني\n
-    5. وقف الخسارة الدقيق\n\n
-    اكتب عنوان جذاب للمنشور في البداية.
-    """
+    prompt = "أنت مستشار مالي ومحلل فني خبير. حدد 5 فرص استثمارية ساخنة ومتنوعة لليوم باللغة العربية بأسلوب احترافي ودون استخدام النجوم."
     try:
         res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
         ai_text = res.text
@@ -478,9 +434,7 @@ async def post_daily_opportunities(context: ContextTypes.DEFAULT_TYPE = None):
             "🔥 **الفرص اليومية الساخنة من StockHunter AI** 🔥\n"
             f"📅 التاريخ: {datetime.date.today().strftime('%Y-%m-%d')}\n"
             "━━━━━━━━━━━━━━━━━━━\n\n"
-            f"{ai_text}\n\n"
-            "━━━━━━━━━━━━━━━━━━━\n"
-            "🤖 لتحليلات مخصصة وإشارات فورية، ابدأ استخدام البوت الآن!"
+            f"{ai_text}\n"
         )
 
         bot = context.bot if context else Application.builder().token(TELEGRAM_TOKEN).build().bot
@@ -515,7 +469,7 @@ async def photo_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("✅ تفعيل واشتراك", callback_data=f"approve_sub_{user_id}_{tier}")]])
         
         await context.bot.send_photo(chat_id=ADMIN_ID, photo=file, caption=caption, reply_markup=keyboard, parse_mode="Markdown")
-        await update.message.reply_text("✅ تم إرسال الإثبات بنجاح. سيقوم الأدمن بمراجعته وتفعيل باقتك فوراً!")
+        await update.message.reply_text("✅ تم إرسال الإثبات بنجاح.")
         user_context[user_id]["state"] = None
 
 def main():
