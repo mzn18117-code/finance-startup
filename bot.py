@@ -245,7 +245,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_context[user_id]["state"] = "WAITING_PAYMENT_PROOF"
 
         usdt_addr = "TXxxxxxxxxxxxxxxxxxxxxxxxx"
-        pp_link = "[https://paypal.me/yourname](https://paypal.me/yourname)"
+        pp_link = "https://paypal.me/yourname"
 
         if method == "usdt":
             msg = f"💰 **الدفع عبر USDT**\n\nالمبلغ: `${PRICES[tier]}`\n\nالعنوان (TRC20):\n`{usdt_addr}`\n\n📸 بعد إتمام التحويل، أرسل صورة الإثبات مباشرة هنا."
@@ -402,13 +402,15 @@ async def fetch_market_insights(update: Update, context: ContextTypes.DEFAULT_TY
     user_id = update.effective_user.id
     prompt = f"أنت محلل مالي خبير ومحترف. اعط تقريراً متكاملاً حول {info_type} في السوق {market} باللغة العربية تماماً دون نجوم."
     try:
+        # تصحيح الموديل ليكون مطابقاً تماماً للمكتبة الرسمية
         res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
         ai_text = res.text
         keyboard = [[InlineKeyboardButton("🔙 العودة للسوق", callback_data=f"mkt_{market.lower()}"), InlineKeyboardButton("🔝 العودة للرئيسية", callback_data="back_home")]]
         await context.bot.send_message(chat_id=user_id, text=ai_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
     except Exception as e:
-        logging.error(f"Insight error: {e}")
-        await context.bot.send_message(chat_id=user_id, text="⚠️ تعذر استخراج تقارير السوق حالياً.")
+        logging.error(f"Insight execution error: {e}", exc_info=True)
+        keyboard = [[InlineKeyboardButton("🔙 العودة", callback_data="back_home")]]
+        await context.bot.send_message(chat_id=user_id, text="⚠️ تعذر استخراج تقارير السوق حالياً بسبب مشكلة في الاتصال بالذكاء الاصطناعي.", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 async def get_best_opportunity_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -422,8 +424,9 @@ async def get_best_opportunity_ai(update: Update, context: ContextTypes.DEFAULT_
         keyboard = [[InlineKeyboardButton("🔝 العودة للرئيسية", callback_data="back_home")]]
         await context.bot.send_message(chat_id=user_id, text=f"🔥 **أقوى فرصة استثمارية تم اكتشافها:**\n\n{ai_text}", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
     except Exception as e:
-        logging.error(f"Opportunity Error: {e}")
-        await context.bot.send_message(chat_id=user_id, text="⚠️ تعذر استخراج الفرصة حالياً.")
+        logging.error(f"Opportunity execution error: {e}", exc_info=True)
+        keyboard = [[InlineKeyboardButton("🔙 العودة", callback_data="back_home")]]
+        await context.bot.send_message(chat_id=user_id, text="⚠️ تعذر استخراج الفرصة حالياً.", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 async def post_daily_opportunities(context: ContextTypes.DEFAULT_TYPE = None):
     logging.info("بدء جلب الفرص اليومية لإرسالها للقناة...")
@@ -455,7 +458,7 @@ async def post_daily_opportunities(context: ContextTypes.DEFAULT_TYPE = None):
         await bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="Markdown")
         logging.info("تم إرسال الفرص الخمس بنجاح إلى القناة!")
     except Exception as e:
-        logging.error(f"Error in daily posting: {e}")
+        logging.error(f"Daily posting error: {e}", exc_info=True)
 
 async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
