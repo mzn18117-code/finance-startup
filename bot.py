@@ -1,3 +1,14 @@
+إليك **الكود الكامل والمحدّث** لملف `bot.py`. 
+
+تم دمج كافة المزايا السابقة مع إضافة **أمر التفعيل الذكي** لتتمكن من ترقية حسابك أو أي مستخدم آخر، بالإضافة إلى برمجة **وظيفة النشر التلقائي** (عبر `apscheduler`) لتقوم بتحليل الأسواق واستخراج **5 فرص استثمارية متنوعة كل يوم الساعة 7 صباحاً** وإرسالها مباشرة إلى قناتك.
+
+---
+
+### 📋 الكود البرمجي الكامل والمحدّث لملف (`bot.py`)
+
+انسخ الكود التالي بالكامل واستبدل به محتويات الملف على **GitHub**:
+
+```python
 import os
 import sqlite3
 import logging
@@ -15,7 +26,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 ADMIN_ID = 7763725732
-CHANNEL_ID = "@StockHunter_AI"
+CHANNEL_ID = "@StockHunter_AI"  # تأكد من رفع البوت كمشرف (Admin) في هذه القناة
 
 PRICES = {
     1: 15, 
@@ -302,6 +313,28 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.delete()
         await start(update, context)
 
+# 🔑 تفعيل الاشتراكات عبر الأدمن
+async def activate_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id != ADMIN_ID:
+        await update.message.reply_text("❌ هذا الأمر مخصص للمطور فقط.")
+        return
+
+    try:
+        target_id = int(context.args[0])
+        tier = int(context.args[1])
+        set_tier_level(target_id, tier)
+        
+        tier_names = {0: "مجاني 🆓", 1: "VIP 👑", 2: "PRO / Elite 🚀"}
+        await update.message.reply_text(f"✅ تم تفعيل باقة **{tier_names.get(tier, 'غير معروفة')}** للمستخدم `{target_id}` بنجاح!")
+        
+        await context.bot.send_message(
+            chat_id=target_id, 
+            text=f"🎉 تهانينا! تم تفعيل اشتراكك في باقة **{tier_names.get(tier)}** بنجاح. استمتع بكافة المزايا الآن!"
+        )
+    except (IndexError, ValueError):
+        await update.message.reply_text("⚠️ الصيغة خاطئة. استخدم:\n`/activate [ID] [Level]`", parse_mode="Markdown")
+
 async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, direct_symbol=None):
     user_id = update.effective_user.id
     user_data = get_user(user_id)
@@ -400,6 +433,40 @@ async def get_best_opportunity_ai(update: Update, context: ContextTypes.DEFAULT_
         logging.error(f"Opportunity Error: {e}")
         await context.bot.send_message(chat_id=user_id, text="⚠️ تعذر استخراج الفرصة حالياً.")
 
+# 📢 النشر التلقائي للقناة: استخراج 5 فرص من الأسواق يومياً
+async def post_daily_opportunities(context: ContextTypes.DEFAULT_TYPE = None):
+    logging.info("بدء جلب الفرص اليومية لإرسالها للقناة...")
+    prompt = (
+        "أنت مستشار مالي ومحلل فني خبير. حدد 5 فرص استثمارية ساخنة ومتنوعة لليوم من أسواق متعددة: "
+        "(مثل: سهم أمريكي، سهم سعودي، عملة رقمية، الذهب، والنفط). "
+        "لكل فرصة، حدد الآتي باللغة العربية بأسلوب احترافي ودون استخدام النجوم:\n"
+        "1. اسم الأصل/الأداة المالية\n"
+        "2. سبب اختيار الفرصة\n"
+        "3. سعر الدخول المتوقع\n"
+        "4. الهدف الأول والهدف الثاني\n"
+        "5. وقف الخسارة الدقيق\n\n"
+        "اكتب عنوان جذاب للمنشور في البداية."
+    )
+    try:
+        res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+        ai_text = res.text
+
+        msg = (
+            "🔥 **الفرص اليومية الساخنة من StockHunter AI** 🔥\n"
+            f"📅 التاريخ: {datetime.date.today().strftime('%Y-%m-%d')}\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            f"{ai_text}\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "🤖 لتحليلات مخصصة وإشارات فورية، ابدأ استخدام البوت الآن!"
+        )
+
+        # في حال تم استدعاء الوظيفة يدوياً أو عبر المجدول
+        bot = context.bot if context else Application.builder().token(TELEGRAM_TOKEN).build().bot
+        await bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="Markdown")
+        logging.info("تم إرسال الفرص الخمس بنجاح إلى القناة!")
+    except Exception as e:
+        logging.error(f"Error in daily posting: {e}")
+
 async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id in user_context and user_context[user_id].get("state") == "AWAITING_SYMBOL_INPUT":
@@ -423,8 +490,16 @@ async def photo_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_context[user_id]["state"] = None
 
 def main():
+    # إعداد المجدول الزمني للوظائف التلقائية
     scheduler = BackgroundScheduler(timezone="UTC")
+    
+    # 1. تصفير العداد اليومي للمستخدمين المجانيين عند الساعة 12 منتصف الليل
     scheduler.add_job(reset_daily_usage, 'cron', hour=0, minute=0)
+    
+    # 2. إرسال 5 فرص للقناة يومياً الساعة 7:00 صباحاً بتوقيت مكة المكرمة (+3 UTC)
+    # 7:00 بتوقيت مكة المكرمة تعادل الساعة 4:00 صباحاً بتوقيت UTC
+    scheduler.add_job(lambda: asyncio.run(post_daily_opportunities()), 'cron', hour=4, minute=0)
+    
     scheduler.start()
 
     port = int(os.environ.get("PORT", 8080))
@@ -434,6 +509,7 @@ def main():
     application = Application.builder().token(TELEGRAM_TOKEN).build()
     
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("activate", activate_user))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.PHOTO, photo_router))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_router))
@@ -458,3 +534,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+```
