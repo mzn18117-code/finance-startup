@@ -1,23 +1,10 @@
-هذا الخطأ يحدث لأنك قمت بنسخ رسالتي التوضيحية السابقة (النص العربي الترحيبي) ولصقتها داخل ملف `bot.py` في GitHub مع الكود البرمجي بالخطأ.
-
-بايثون يحاول قراءة النص العربي ككود برمجي، وعندما يجد الفاصلة العربية (`،`) يظهر لك خطأ `SyntaxError`.
-
----
-
-### 🛠️ الحل النهائي والمباشر
-
-يجب أن يحتوي ملف `bot.py` على **الكود البرمجي فقط** بدون أي نصوص عربية خارج الكود.
-
-امسح كل شيء موجود حالياً في ملف `bot.py` على **GitHub**، وانسخ الكود التالي بالكامل والصقه هناك:
-
-```python
 import os
 import sqlite3
 import logging
 import asyncio
 import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
-import yfinance as f
+import yfinance as yf
 from google import genai
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
@@ -333,7 +320,7 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     loading = await context.bot.send_message(chat_id=user_id, text=f"⏳ جاري فحص وتحليل `{symbol}`...")
 
     try:
-        ticker = f.Ticker(symbol)
+        ticker = yf.Ticker(symbol)
         history = ticker.history(period="1mo")
         if history.empty:
             await context.bot.delete_message(chat_id=user_id, message_id=loading.message_id)
@@ -471,4 +458,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-```
