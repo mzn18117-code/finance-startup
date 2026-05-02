@@ -17,10 +17,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 ADMIN_ID = 7763725732
 CHANNEL_ID = "@StockHunter_AI"
 
-PRICES = {
-    1: 15, 
-    2: 49  
-}
+PRICES = {1: 15, 2: 49}
 
 if not TELEGRAM_TOKEN or not GEMINI_API_KEY:
     raise ValueError("⚠️ تأكد من إدخال TELEGRAM_TOKEN و GEMINI_API_KEY في متغيرات البيئة!")
@@ -136,13 +133,11 @@ class PingServer(BaseHTTPRequestHandler):
 
 user_context = {}
 
-# دالة ذكية لتقسيم الرسائل الطويلة وإرسالها بأمان لتجنب خطأ تلغرام
 async def send_split_message(context: ContextTypes.DEFAULT_TYPE, chat_id, text, reply_markup=None):
     max_length = 4000
     if len(text) <= max_length:
         await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode="Markdown")
     else:
-        # تقسيم النص إلى فقرات لضمان عدم كسر الكلمات
         parts = []
         while len(text) > 0:
             if len(text) <= max_length:
@@ -156,7 +151,6 @@ async def send_split_message(context: ContextTypes.DEFAULT_TYPE, chat_id, text, 
                 text = text[split_idx:].strip()
 
         for i, part in enumerate(parts):
-            # إرسال الأزرار فقط مع الجزء الأخير من الرسالة
             markup = reply_markup if i == len(parts) - 1 else None
             await context.bot.send_message(chat_id=chat_id, text=part, reply_markup=markup, parse_mode="Markdown")
 
@@ -362,10 +356,11 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         return
 
     symbol = direct_symbol.upper().strip() if direct_symbol else update.message.text.upper().strip()
-    loading = await context.bot.send_message(chat_id=user_id, text=f"⏳ جاري فحص وتحليل `{symbol}`...")
+    loading = await context.bot.send_message(chat_id=user_id, text=f"⏳ جاري فحص وتحليل `{symbol}` بعمق...")
 
     try:
         ticker = yf.Ticker(symbol)
+        # جلب بيانات فنية حقيقية لمدة شهر لدراسة السوق
         history = ticker.history(period="1mo")
         if history.empty:
             history = ticker.history(period="1wk")
@@ -375,48 +370,51 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             await context.bot.send_message(chat_id=user_id, text=f"❌ الرمز `{symbol}` غير متاح أو غير موجود حالياً.")
             return
 
+        # استخراج المتغيرات المالية الدقيقة
         current_p = float(history['Close'].dropna().iloc[-1])
-        change = ((current_p - float(history['Close'].iloc[0])) / float(history['Close'].iloc[0])) * 100
+        highest_30 = float(history['High'].dropna().max())
+        lowest_30 = float(history['Low'].dropna().min())
+        first_p = float(history['Close'].dropna().iloc[0])
+        change_30 = ((current_p - first_p) / first_p) * 100
+
+        # إنشاء أمر صارم ومبني على البيانات
+        prompt = f"""
+        أنت مستشار مالي ومحلل فني محترف وخبير في الأسواق المالية.
+        حلل الأصل المالي التالي بناءً على البيانات الدقيقة المرفقة:
+        - رمز السهم: {symbol}
+        - السعر الحالي: {current_p:.2f}
+        - أعلى سعر في 30 يوم: {highest_30:.2f}
+        - أدنى سعر في 30 يوم: {lowest_30:.2f}
+        - التغير في آخر 30 يوم: {change_30:+.2f}%
+
+        المطلوب منك تحليل عميق ومباشر باللغة العربية ودون استخدام النجوم:
+        1. الاتجاه العام المتوقع: هل السعر سيهبط أم سيرتفع؟ ولماذا؟
+        2. قرار مالي واضح ومباشر: (شراء، بيع، أو انتظار).
+        3. المستويات الفنية: حدد بدقة سعر الدخول المناسب، والهدف الأول، ووقف الخسارة الصارم.
+        كن حازماً واكتب كلاماً مبنياً على الأرقام وليس جملاً إنشائية عامة.
+        """
+
+        res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+        ai_text = res.text
+
+        # تنسيق التقرير النهائي للمستخدم
+        report = (
+            f"📊 **التحليل الفني المعمق لـ:** `{symbol}`\n"
+            f"💰 **السعر الحالي:** {current_p:.2f}\n"
+            f"🔝 **أعلى سعر (30 يوم):** {highest_30:.2f}\n"
+            f"🔙 **أدنى سعر (30 يوم):** {lowest_30:.2f}\n"
+            f"📈 **أداء الشهر:** {change_30:+.2f}%\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            f"🤖 **توصية وقرار الذكاء الاصطناعي:**\n\n{ai_text}\n"
+        )
 
         if tier_level == 0:
             increment_usage(user_id)
-            prompt = f"قم بعمل تحليل سريع ومختصر لسهم {symbol}: السعر الحالي {current_p}, الأداء خلال الفترة {change:.1f}%. اعط ملخص سريع جداً باللغة العربية دون استخدام أي نجوم (بحد أقصى 200 كلمة)."
-            res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
-            ai_text = res.text
-            
-            report = (
-                f"📊 **تحليل مجاني لـ:** `{symbol}`\n"
-                f"💰 **السعر الحالي:** {current_p:.2f}\n"
-                f"📈 **أداء الفترة:** {change:+.2f}%\n"
-                "━━━━━━━━━━━━━━━━━━━\n"
-                f"🤖 **التقرير المختصر:**\n\n{ai_text}\n"
-                "━━━━━━━━━━━━━━━━━━━\n"
-                "🔒 الأهداف السعرية العميقة ووقف الخسارة متوفرة للمشتركين VIP."
-            )
-        else:
-            prompt = f"""
-            أنت محلل أسواق أول ومستشار مالي. حلل {symbol}: السعر الحالي {current_p}, أداء الفترة {change:.2f}%.
-            اكتب تقرير احترافي وعميق للمشتركين باللغة العربية تماماً ودون استخدام أي نجوم.
-            تأكد أن النص يكون متوسط الحجم ولا يتجاوز 500 كلمة:
-            1. تقييم الأصل (فرصة شراء أم بيع أم تصحيح).
-            2. الأهداف السعرية القريبة والبعيدة.
-            3. وقف الخسارة الصارم.
-            """
-            res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
-            ai_text = res.text
-
-            report = (
-                f"📊 **التقرير الاحترافي للمشتركين لـ:** `{symbol}`\n"
-                f"💰 **السعر الحالي:** {current_p:.2f}\n"
-                f"📈 **الأداء:** {change:+.2f}%\n"
-                "━━━━━━━━━━━━━━━━━━━\n"
-                f"🤖 **تحليل وتحركات الذكاء الاصطناعي الكاملة:**\n\n{ai_text}\n"
-            )
+            report += "━━━━━━━━━━━━━━━━━━━\n🔒 للوصول الدائم للتحليلات الحصرية، اشترك في باقات VIP."
 
         add_to_favorites(user_id, symbol)
         keyboard = [[InlineKeyboardButton("🔝 العودة للرئيسية", callback_data="back_home")]]
         await context.bot.delete_message(chat_id=user_id, message_id=loading.message_id)
-        # استخدام دالة الإرسال المجزأة
         await send_split_message(context, user_id, report, reply_markup=InlineKeyboardMarkup(keyboard))
 
     except Exception as e:
@@ -426,12 +424,14 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
 async def fetch_market_insights(update: Update, context: ContextTypes.DEFAULT_TYPE, market, info_type):
     user_id = update.effective_user.id
-    prompt = f"أنت محلل مالي خبير ومحترف. اعط تقريراً متوسط الحجم ومتكاملاً حول {info_type} في السوق {market} باللغة العربية تماماً دون استخدام النجوم (بحد أقصى 500 كلمة)."
+    prompt = f"""
+    أنت محلل مالي أول. اعط تقريراً عميقاً ومباشراً حول {info_type} في السوق {market} باللغة العربية ودون استخدام أي نجوم.
+    حدد الأسهم أو الأصول المتوقع ارتفاعها أو هبوطها بناءً على معطيات السوق الحالية، مع ذكر أرقام مستهدفة وقرارات واضحة.
+    """
     try:
         res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
         ai_text = res.text
         keyboard = [[InlineKeyboardButton("🔙 العودة للسوق", callback_data=f"mkt_{market.lower()}"), InlineKeyboardButton("🔝 العودة للرئيسية", callback_data="back_home")]]
-        # استخدام دالة الإرسال المجزأة لضمان عدم تجاوز الحد
         await send_split_message(context, user_id, ai_text, reply_markup=InlineKeyboardMarkup(keyboard))
     except Exception as e:
         logging.error(f"AI Insights error: {e}", exc_info=True)
@@ -440,15 +440,18 @@ async def fetch_market_insights(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def get_best_opportunity_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    prompt = (
-        "أنت محلل أول لصناديق الاستثمار. حدد فرصة استثمارية واحدة حالية وممتازة بالسوق العالمي أو الرقمي. "
-        "اكتب تقريراً دقيقاً متوسط الحجم باللغة العربية دون استخدام النجوم: الأصل، سعر الدخول، الهدف المتوقع، وقف الخسارة، وتحليل المخاطر."
-    )
+    prompt = """
+    أنت مدير محفظة استثمارية وصناديق تحوط. حدد فرصة استثمارية واحدة حقيقية وجاهزة للدخول الفوري في الأسواق العالمية أو العملات الرقمية.
+    اكتب تقريراً باللغة العربية تماماً دون استخدام نجوم يتضمن بدقة:
+    1. رمز الأصل وسعره الحالي.
+    2. الاتجاه القادم بدقة (لماذا سيرتفع).
+    3. سعر الدخول الدقيق، الهدف الأول، الهدف الثاني، ووقف الخسارة الصارم.
+    """
     try:
         res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
         ai_text = res.text
         keyboard = [[InlineKeyboardButton("🔝 العودة للرئيسية", callback_data="back_home")]]
-        await send_split_message(context, user_id, f"🔥 **أقوى فرصة استثمارية تم اكتشافها:**\n\n{ai_text}", reply_markup=InlineKeyboardMarkup(keyboard))
+        await send_split_message(context, user_id, f"🔥 **أقوى فرصة تم اكتشافها الآن:**\n\n{ai_text}", reply_markup=InlineKeyboardMarkup(keyboard))
     except Exception as e:
         logging.error(f"AI Opportunity error: {e}", exc_info=True)
         keyboard = [[InlineKeyboardButton("🔙 العودة", callback_data="back_home")]]
@@ -456,17 +459,17 @@ async def get_best_opportunity_ai(update: Update, context: ContextTypes.DEFAULT_
 
 async def post_daily_opportunities(context: ContextTypes.DEFAULT_TYPE = None):
     logging.info("بدء جلب الفرص اليومية لإرسالها للقناة...")
-    prompt = (
-        "أنت مستشار مالي ومحلل فني خبير. حدد 5 فرص استثمارية ساخنة ومتنوعة لليوم من أسواق متعددة: "
-        "(مثل: سهم أمريكي، سهم سعودي، عملة رقمية، الذهب، والنفط). "
-        "لكل فرصة، حدد الآتي باللغة العربية بأسلوب احترافي ودون استخدام النجوم:\n"
-        "1. اسم الأصل/الأداة المالية\n"
-        "2. سبب اختيار الفرصة\n"
-        "3. سعر الدخول المتوقع\n"
-        "4. الهدف الأول والهدف الثاني\n"
-        "5. وقف الخسارة الدقيق\n\n"
-        "اكتب عنوان جذاب للمنشور في البداية."
-    )
+    prompt = """
+    أنت مستشار مالي ومحلل فني خبير. حدد 5 فرص استثمارية ساخنة ومتنوعة لليوم من أسواق متعددة: 
+    (مثل: سهم أمريكي، سهم سعودي، عملة رقمية، الذهب، والنفط). 
+    لكل فرصة، حدد الآتي باللغة العربية بأسلوب احترافي ودون استخدام النجوم:\n
+    1. اسم الأصل/الأداة المالية\n
+    2. سبب اختيار الفرصة الفني والمالي\n
+    3. سعر الدخول المتوقع\n
+    4. الهدف الأول والهدف الثاني\n
+    5. وقف الخسارة الدقيق\n\n
+    اكتب عنوان جذاب للمنشور في البداية.
+    """
     try:
         res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
         ai_text = res.text
@@ -481,8 +484,6 @@ async def post_daily_opportunities(context: ContextTypes.DEFAULT_TYPE = None):
         )
 
         bot = context.bot if context else Application.builder().token(TELEGRAM_TOKEN).build().bot
-        
-        # التأكد من تقسيم الرسالة حتى للقناة في حال كانت طويلة
         max_length = 4000
         if len(msg) <= max_length:
             await bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="Markdown")
