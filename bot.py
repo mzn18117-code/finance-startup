@@ -1,14 +1,3 @@
-إليك **الكود الكامل والمحدّث** لملف `bot.py`. 
-
-تم دمج كافة المزايا السابقة مع إضافة **أمر التفعيل الذكي** لتتمكن من ترقية حسابك أو أي مستخدم آخر، بالإضافة إلى برمجة **وظيفة النشر التلقائي** (عبر `apscheduler`) لتقوم بتحليل الأسواق واستخراج **5 فرص استثمارية متنوعة كل يوم الساعة 7 صباحاً** وإرسالها مباشرة إلى قناتك.
-
----
-
-### 📋 الكود البرمجي الكامل والمحدّث لملف (`bot.py`)
-
-انسخ الكود التالي بالكامل واستبدل به محتويات الملف على **GitHub**:
-
-```python
 import os
 import sqlite3
 import logging
@@ -26,7 +15,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 ADMIN_ID = 7763725732
-CHANNEL_ID = "@StockHunter_AI"  # تأكد من رفع البوت كمشرف (Admin) في هذه القناة
+CHANNEL_ID = "@StockHunter_AI"
 
 PRICES = {
     1: 15, 
@@ -313,7 +302,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.delete()
         await start(update, context)
 
-# 🔑 تفعيل الاشتراكات عبر الأدمن
 async def activate_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != ADMIN_ID:
@@ -433,7 +421,6 @@ async def get_best_opportunity_ai(update: Update, context: ContextTypes.DEFAULT_
         logging.error(f"Opportunity Error: {e}")
         await context.bot.send_message(chat_id=user_id, text="⚠️ تعذر استخراج الفرصة حالياً.")
 
-# 📢 النشر التلقائي للقناة: استخراج 5 فرص من الأسواق يومياً
 async def post_daily_opportunities(context: ContextTypes.DEFAULT_TYPE = None):
     logging.info("بدء جلب الفرص اليومية لإرسالها للقناة...")
     prompt = (
@@ -460,7 +447,6 @@ async def post_daily_opportunities(context: ContextTypes.DEFAULT_TYPE = None):
             "🤖 لتحليلات مخصصة وإشارات فورية، ابدأ استخدام البوت الآن!"
         )
 
-        # في حال تم استدعاء الوظيفة يدوياً أو عبر المجدول
         bot = context.bot if context else Application.builder().token(TELEGRAM_TOKEN).build().bot
         await bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="Markdown")
         logging.info("تم إرسال الفرص الخمس بنجاح إلى القناة!")
@@ -490,16 +476,9 @@ async def photo_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_context[user_id]["state"] = None
 
 def main():
-    # إعداد المجدول الزمني للوظائف التلقائية
     scheduler = BackgroundScheduler(timezone="UTC")
-    
-    # 1. تصفير العداد اليومي للمستخدمين المجانيين عند الساعة 12 منتصف الليل
     scheduler.add_job(reset_daily_usage, 'cron', hour=0, minute=0)
-    
-    # 2. إرسال 5 فرص للقناة يومياً الساعة 7:00 صباحاً بتوقيت مكة المكرمة (+3 UTC)
-    # 7:00 بتوقيت مكة المكرمة تعادل الساعة 4:00 صباحاً بتوقيت UTC
     scheduler.add_job(lambda: asyncio.run(post_daily_opportunities()), 'cron', hour=4, minute=0)
-    
     scheduler.start()
 
     port = int(os.environ.get("PORT", 8080))
@@ -534,4 +513,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-```
