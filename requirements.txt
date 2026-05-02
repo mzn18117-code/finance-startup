@@ -1,6 +1,4 @@
-python-telegram-bot==20.8
 google-genai
+python-telegram-bot==20.8
 yfinance
 apscheduler
-requests
-urllib3
