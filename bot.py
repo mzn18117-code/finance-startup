@@ -25,7 +25,6 @@ PRICES = {
 if not TELEGRAM_TOKEN or not GEMINI_API_KEY:
     raise ValueError("⚠️ تأكد من إدخال TELEGRAM_TOKEN و GEMINI_API_KEY في متغيرات البيئة!")
 
-# تهيئة العميل
 client = genai.Client(api_key=GEMINI_API_KEY)
 DB_FILE = "bot_data.db"
 
@@ -136,6 +135,30 @@ class PingServer(BaseHTTPRequestHandler):
         self.wfile.write("البوت الذكي يعمل بنجاح 🚀".encode("utf-8"))
 
 user_context = {}
+
+# دالة ذكية لتقسيم الرسائل الطويلة وإرسالها بأمان لتجنب خطأ تلغرام
+async def send_split_message(context: ContextTypes.DEFAULT_TYPE, chat_id, text, reply_markup=None):
+    max_length = 4000
+    if len(text) <= max_length:
+        await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode="Markdown")
+    else:
+        # تقسيم النص إلى فقرات لضمان عدم كسر الكلمات
+        parts = []
+        while len(text) > 0:
+            if len(text) <= max_length:
+                parts.append(text)
+                break
+            else:
+                split_idx = text.rfind('\n', 0, max_length)
+                if split_idx == -1:
+                    split_idx = max_length
+                parts.append(text[:split_idx])
+                text = text[split_idx:].strip()
+
+        for i, part in enumerate(parts):
+            # إرسال الأزرار فقط مع الجزء الأخير من الرسالة
+            markup = reply_markup if i == len(parts) - 1 else None
+            await context.bot.send_message(chat_id=chat_id, text=part, reply_markup=markup, parse_mode="Markdown")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -357,7 +380,7 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
         if tier_level == 0:
             increment_usage(user_id)
-            prompt = f"قم بعمل تحليل سريع لسهم {symbol}: السعر الحالي {current_p}, الأداء خلال الفترة {change:.1f}%. اعط ملخص سريع جداً باللغة العربية دون نجوم."
+            prompt = f"قم بعمل تحليل سريع ومختصر لسهم {symbol}: السعر الحالي {current_p}, الأداء خلال الفترة {change:.1f}%. اعط ملخص سريع جداً باللغة العربية دون استخدام أي نجوم (بحد أقصى 200 كلمة)."
             res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
             ai_text = res.text
             
@@ -373,7 +396,8 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         else:
             prompt = f"""
             أنت محلل أسواق أول ومستشار مالي. حلل {symbol}: السعر الحالي {current_p}, أداء الفترة {change:.2f}%.
-            اكتب تقرير احترافي وعميق للمشتركين باللغة العربية تماماً ودون نجوم:
+            اكتب تقرير احترافي وعميق للمشتركين باللغة العربية تماماً ودون استخدام أي نجوم.
+            تأكد أن النص يكون متوسط الحجم ولا يتجاوز 500 كلمة:
             1. تقييم الأصل (فرصة شراء أم بيع أم تصحيح).
             2. الأهداف السعرية القريبة والبعيدة.
             3. وقف الخسارة الصارم.
@@ -392,7 +416,8 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         add_to_favorites(user_id, symbol)
         keyboard = [[InlineKeyboardButton("🔝 العودة للرئيسية", callback_data="back_home")]]
         await context.bot.delete_message(chat_id=user_id, message_id=loading.message_id)
-        await context.bot.send_message(chat_id=user_id, text=report, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+        # استخدام دالة الإرسال المجزأة
+        await send_split_message(context, user_id, report, reply_markup=InlineKeyboardMarkup(keyboard))
 
     except Exception as e:
         logging.error(f"Analysis error: {e}", exc_info=True)
@@ -401,35 +426,33 @@ async def fetch_and_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
 async def fetch_market_insights(update: Update, context: ContextTypes.DEFAULT_TYPE, market, info_type):
     user_id = update.effective_user.id
-    prompt = f"أنت محلل مالي خبير ومحترف. اعط تقريراً متكاملاً حول {info_type} في السوق {market} باللغة العربية تماماً دون نجوم."
+    prompt = f"أنت محلل مالي خبير ومحترف. اعط تقريراً متوسط الحجم ومتكاملاً حول {info_type} في السوق {market} باللغة العربية تماماً دون استخدام النجوم (بحد أقصى 500 كلمة)."
     try:
         res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
         ai_text = res.text
         keyboard = [[InlineKeyboardButton("🔙 العودة للسوق", callback_data=f"mkt_{market.lower()}"), InlineKeyboardButton("🔝 العودة للرئيسية", callback_data="back_home")]]
-        await context.bot.send_message(chat_id=user_id, text=ai_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+        # استخدام دالة الإرسال المجزأة لضمان عدم تجاوز الحد
+        await send_split_message(context, user_id, ai_text, reply_markup=InlineKeyboardMarkup(keyboard))
     except Exception as e:
-        # هنا جعلنا البوت يرسل الخطأ الدقيق للمستخدم لتشخيص المشكلة فوراً
         logging.error(f"AI Insights error: {e}", exc_info=True)
-        error_msg = f"⚠️ **حدث خطأ من خوادم Google:**\n`{str(e)}`"
         keyboard = [[InlineKeyboardButton("🔙 العودة للرئيسية", callback_data="back_home")]]
-        await context.bot.send_message(chat_id=user_id, text=error_msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+        await context.bot.send_message(chat_id=user_id, text=f"⚠️ حدث خطأ: {str(e)}", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 async def get_best_opportunity_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     prompt = (
         "أنت محلل أول لصناديق الاستثمار. حدد فرصة استثمارية واحدة حالية وممتازة بالسوق العالمي أو الرقمي. "
-        "اكتب تقريراً دقيقاً باللغة العربية دون نجوم: الأصل، سعر الدخول، الهدف المتوقع، وقف الخسارة، وتحليل المخاطر."
+        "اكتب تقريراً دقيقاً متوسط الحجم باللغة العربية دون استخدام النجوم: الأصل، سعر الدخول، الهدف المتوقع، وقف الخسارة، وتحليل المخاطر."
     )
     try:
         res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
         ai_text = res.text
         keyboard = [[InlineKeyboardButton("🔝 العودة للرئيسية", callback_data="back_home")]]
-        await context.bot.send_message(chat_id=user_id, text=f"🔥 **أقوى فرصة استثمارية تم اكتشافها:**\n\n{ai_text}", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+        await send_split_message(context, user_id, f"🔥 **أقوى فرصة استثمارية تم اكتشافها:**\n\n{ai_text}", reply_markup=InlineKeyboardMarkup(keyboard))
     except Exception as e:
         logging.error(f"AI Opportunity error: {e}", exc_info=True)
-        error_msg = f"⚠️ **حدث خطأ أثناء استخراج الفرصة:**\n`{str(e)}`"
         keyboard = [[InlineKeyboardButton("🔙 العودة", callback_data="back_home")]]
-        await context.bot.send_message(chat_id=user_id, text=error_msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+        await context.bot.send_message(chat_id=user_id, text=f"⚠️ حدث خطأ: {str(e)}", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 async def post_daily_opportunities(context: ContextTypes.DEFAULT_TYPE = None):
     logging.info("بدء جلب الفرص اليومية لإرسالها للقناة...")
@@ -458,7 +481,16 @@ async def post_daily_opportunities(context: ContextTypes.DEFAULT_TYPE = None):
         )
 
         bot = context.bot if context else Application.builder().token(TELEGRAM_TOKEN).build().bot
-        await bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="Markdown")
+        
+        # التأكد من تقسيم الرسالة حتى للقناة في حال كانت طويلة
+        max_length = 4000
+        if len(msg) <= max_length:
+            await bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="Markdown")
+        else:
+            parts = [msg[i:i+max_length] for i in range(0, len(msg), max_length)]
+            for part in parts:
+                await bot.send_message(chat_id=CHANNEL_ID, text=part, parse_mode="Markdown")
+
         logging.info("تم إرسال الفرص الخمس بنجاح إلى القناة!")
     except Exception as e:
         logging.error(f"AI Posting error: {e}", exc_info=True)
