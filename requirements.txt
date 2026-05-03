@@ -1,5 +1,6 @@
 aiogram==2.25.1
+yfinance
 transformers
-torch
+torch --index-url https://download.pytorch.org/whl/cpu
 supabase
 python-dotenv
